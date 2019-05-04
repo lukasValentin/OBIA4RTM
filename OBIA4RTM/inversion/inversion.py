@@ -13,9 +13,8 @@ import prosail
 import numpy as np
 import json
 
-import lookup_table as lut
-from handle_metadata import get_resampler
-#import get_mean_refl
+import OBIA4RTM.inversion.lookup_table as lut
+from OBIA4RTM.inversion.handle_metadata import get_resampler
 
 
 class inversion:

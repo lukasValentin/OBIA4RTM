@@ -7,7 +7,7 @@ Created on Sat Mar  9 06:52:00 2019
 """
 import itertools
 import numpy as np
-from distributions import gaussian, uniform
+from OBIA4RTM.inversion.distributions import gaussian, uniform
 
 
 class lookup_table:

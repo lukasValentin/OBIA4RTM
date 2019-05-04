@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, sys
+import sys
 import numpy as np
 from osgeo import ogr, osr, gdal
 import psycopg2
