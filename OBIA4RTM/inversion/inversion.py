@@ -74,7 +74,7 @@ class inversion:
         # basic setup
         # initial plant parameters
         
-        # default soil-spectra
+        # default soil-spectra -> move to DB?
         try:
             soils = np.genfromtxt("soil_reflectance.txt")
         except Exception as ex:
@@ -379,6 +379,14 @@ class inversion:
             if resrun != 0:
                 self.conn.rollback()
                 continue
+            # endif
+        # endfor
         
-        
-           
+        # close database connection at the end
+        if self.conn is not None:
+            self.cursor.close()
+            self.conn.close()
+        # endif
+    
+    # end do_inversion
+# end class

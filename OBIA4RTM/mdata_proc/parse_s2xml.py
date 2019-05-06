@@ -8,7 +8,7 @@ Created on Mon Apr  1 13:54:35 2019
 from xml.dom import minidom
 
 
-def get_spatiotemporal_data(xml_file):
+def parse_s2xml(xml_file):
     """
     parses S2 xml file and extractes the metadata into a dictionary
     """
