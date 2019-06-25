@@ -1,5 +1,6 @@
 **OBIA4RTM**
 ------------
+[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375)
 
 An open-source tool for object-based image analysis for radiative transfer modeling
 using ProSAIL (Prospect5 + 4SAIL).
@@ -58,4 +59,7 @@ Demodata produced with OBIA4RTM
 
 Sample data can be found here: http://dx.doi.org/10.17632/vs55cwssyh.1 showing some Sentinel-2 data that was processed using OBIA4RTM in an agricultural area in Southern Germany.
 
+OBIA4RTM
+--------
+[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375)
 
