@@ -27,7 +27,7 @@ Workflow
 
 The overall workflow implemented in OBIA4RTM is shown below.
 
-![OBIA4RTM Workflow](https://github.com/lukasValentin/OBIA4RTM/OBIA4RTM_Workflow.gif "OBIA4RTM Workflow Overview")
+![OBIA4RTM Workflow](https://github.com/lukasValentin/OBIA4RTM/blob/master/OBIA4RTM_Workflow.gif "OBIA4RTM Workflow Overview")
 
 
 It should be noted, that:
