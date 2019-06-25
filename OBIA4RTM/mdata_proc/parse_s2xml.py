@@ -10,7 +10,19 @@ from xml.dom import minidom
 
 def parse_s2xml(xml_file):
     """
-    parses S2 xml file and extractes the metadata into a dictionary
+    Parses S2 xml file and extractes the metadata into a dictionary
+    derived from Sen2Core Atmospheric Correction
+    
+    Parameters
+    ----------
+    xml_file : String
+        Filename (incl. file path) of the scene metadata xml
+    
+    Returns
+    -------
+    metadata : Dictionary
+        Dictionary containing the most relevant scene metadata (geometries, SRS, preclass, ...)
+    
     """
     # parse the xml file into a minidom object
     xmldoc = minidom.parse(xml_file)
