@@ -27,6 +27,9 @@ Workflow
 
 The overall workflow implemented in OBIA4RTM is shown below.
 
+![OBIA4RTM Workflow](/daten/OBIA-RTM_S2/Copernicus_Masters/OBIA4RTM_Workflow.gif "OBIA4RTM Workflow Overview")
+
+
 It should be noted, that:
 
 - OBIA4RTM expects stacked Sentinel-2 (A and B) image data as GeoTiff-File. Only the following Sentinel-2 bands (wavelengths and bandwidths shown for Sentinel-2A only) are used: 
