@@ -1,5 +1,6 @@
 --
 -- query to apply the RMSE cost function for inverting a given object
+-- can be also used pixel-based
 -- Lukas Graf, graflukas@web.de
 --
 SELECT 

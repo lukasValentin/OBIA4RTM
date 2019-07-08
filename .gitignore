@@ -5,3 +5,4 @@
 # ignore egg-info
 *.egg
 *.egg-info/
+TODOS.txt

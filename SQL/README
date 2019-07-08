@@ -1,8 +1,0 @@
-This folder provides PostgreSQL statements, queries and functions to
-
-- set up the data model required for OBIA4RTM (see ./Tables)
-
-- set up functions for the parameter retrieval and queries to obtain results from the database (./Queries_Functions)
-
-By default, the public-Schema will be used. In case OBIA4RTM shall be used for various regions independendly, it is suggested
-to use an additional schema for each additional setting.
