@@ -12,7 +12,7 @@ import sys
 import prosail
 import numpy as np
 import json
-
+import OBIA4RTM
 import OBIA4RTM.inversion.lookup_table as lut
 from OBIA4RTM.inversion.handle_metadata import get_resampler
 
@@ -22,16 +22,21 @@ class inversion:
     performs the inversion of a satellite scene
     """
     
-    def __init__(self, sensor, scene_id, postgres_init="postgres.ini", path_to_config="config.txt"):
-        
+    def __init__(self, sensor, scene_id, path_to_config="config.txt"):
+
         self.path_to_config = path_to_config
         self.sensor = sensor
         self.scene_id = scene_id
-        
+
         # setup the DB connection
         try:
             # read the connection parameters from config-file (see template postgres.ini)
             parser = ConfigParser()
+            directory = os.path.dirname(OBIA4RTM.__file__)
+            postgres_init = directory + os.sep + 'postgres.ini'
+            if not os.path.isfile(postgres_init):
+                print('postgres.ini konnte nicht gefunden werden!')
+                sys.exit(-1)
             parser.read(postgres_init)
             # and store them in a string
             conn_str = "host='{}' dbname='{}' user='{}' password='{}'". format(
@@ -40,27 +45,26 @@ class inversion:
                     parser.get('POSTGRESQL', 'username'),
                     parser.get('POSTGRESQL', 'password')
                     )
-            
+
             # open connection
             self.conn = psycopg2.connect(conn_str)
             self.cursor = self.conn.cursor()
-            
-        except (Exception, psycopg2.DatabaseError) as err:
-            
+
+        except (psycopg2.DatabaseError) as err:
+
             print ("ERROR: Unable to connect to the database")
             print (err)
             sys.exit(-1)
-        
+
         # try to locate the PROSAIL config file
         if (not os.path.isfile(path_to_config)):
             
             print("ERROR: Unable to locate the config file for PROSAIL!")
             sys.exit(-1)
-        
         # endif
-    
     # end __init__
-        
+
+
     def gen_lut(self, inv_table, luc, acqui_date):
         """
         Generates the lookup table and stores it in the DB
@@ -68,12 +72,9 @@ class inversion:
         # firstly, create the LUT from the params config file
         param_lut = lut.lookup_table(self.path_to_config)
         param_lut.generate_param_lut()
-        
         print("INFO: Start to generate ProSAIL-LUT with " + str(param_lut.lut_size) + " simulations")
-        
         # basic setup
         # initial plant parameters
-        
         # default soil-spectra -> move to DB?
         try:
             soils = np.genfromtxt("soil_reflectance.txt")

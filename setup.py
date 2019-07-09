@@ -14,13 +14,11 @@ setuptools.setup(name='OBIA4RTM',
       long_description = long_description,
       long_description_content_type = 'text/markdown',
       author='Lukas Graf',
-      author_email =' lukas.graf@stud.sbg.ac.at',
+      author_email ='graflukas@web.de',
       url = 'https://github.com/lukasValentin/OBIA4RTM',
-      packages=setuptools.find_packages(
-            "psycopg2",
-            "numpy",
-            "prosail"
-            ),
+      include_package_data=True,
+      package_data={'OBIA4RTM': ['postgres.ini', './SQL/Tables/*.sql', './SQL/Queries_Functions/*.sql']},
+      packages=setuptools.find_packages(),
       classifiers = [
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

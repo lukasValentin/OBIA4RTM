@@ -1,2 +1,4 @@
-include config/*.ini
+include postgres.ini
 include README.md
+include /SQL/Tables/*.sql
+include /SQL/Queries_Functions/*.sql
