@@ -1,4 +1,6 @@
 include postgres.ini
 include README.md
+include prosail.txt
+include soil_reflectance.txt
 include /SQL/Tables/*.sql
 include /SQL/Queries_Functions/*.sql

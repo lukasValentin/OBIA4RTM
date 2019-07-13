@@ -3,7 +3,29 @@
 """
 Created on Sat Mar  9 06:52:00 2019
 
-@author: lukas
+This module is part of OBIA4RTM.
+
+Copyright (c) 2019 Lukas Graf
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+@author: Lukas Graf, graflukas@web.de
 """
 import itertools
 import numpy as np
@@ -15,26 +37,36 @@ class lookup_table:
     class for creating and storing biophysical parameters
     in a lookup table like structure
     """
-    
-    def __init__(self, path_to_config):
+    def __init__(self):
         """
-        setup the class
+        class constructor
         """
-        
-        try:
-            self.params = np.genfromtxt(path_to_config, delimiter = "\t")
-        except (Exception) as ex:
-            print("Could not read config file!")
-            print(ex)
-    # end __init__
-    
-    def generate_param_lut(self):
+        self.const_params = None
+        self.dist = None
+        self.inv_params = None
+        self.lut = None
+        self.lut_shape = None
+        self.lut_size = None
+        self.maxima = None
+        self.mean = None
+        self.minima = None
+        self.num = None
+        self.std = None
+        self.to_be_inv = None
+
+
+    def generate_param_lut(self, params):
         """
         get the minima, maxima, number and distribution type of parameters
-        to be inverted and stores them into a LUT accordingly
+        to be inverted and prepares them for storing in a LUT accordingly
+        
+        Parameters
+        ----------
+        params : numpy array
+            Array containing the ProSAIL parameters extracted from cfg file
         """
         try:
-            self.minima, self.maxima, self.num, self.dist, self.mean, self.std = self.params[:,0], self.params[:,1], self.params[:,2], self.params[:,3], self.params[:,4], self.params[:,5]
+            self.minima, self.maxima, self.num, self.dist, self.mean, self.std = params[:,0], params[:,1], params[:,2], params[:,3], params[:,4], params[:,5]
         except (ValueError) as err:
             print("Unable to read from config file - Please check!")
             print(err)
@@ -53,7 +85,7 @@ class lookup_table:
         self.lut_size = int(self.lut_size)
         
         # open the lookup table for the parameters
-        self.lut_shape = (self.params.shape[0], int(self.lut_size))
+        self.lut_shape = (params.shape[0], int(self.lut_size))
         self.lut = np.ndarray(shape=self.lut_shape, dtype=np.float32)
         
         # insert the const values first

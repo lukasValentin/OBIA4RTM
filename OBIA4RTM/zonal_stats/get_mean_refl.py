@@ -6,11 +6,11 @@ from osgeo import ogr, osr, gdal
 import psycopg2
 
 
-def get_mean_refl(shp_file, raster_file, num_bands, acqui_date, conn, cursor, table_name):
+def get_mean_refl(shp_file, raster_file, num_bands, acqui_date, conn, cursor,
+                  table_name):
     """
     calculates mean reflectance per object in image
     """
-    
     # iterate over the shapefile to get the metadata
     # Shapefile handling
     driver = ogr.GetDriverByName('ESRI Shapefile')

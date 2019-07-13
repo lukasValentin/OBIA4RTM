@@ -6,3 +6,6 @@
 *.egg
 *.egg-info/
 TODOS.txt
+build/
+dist/
+OBIA4RTM.egg-info/

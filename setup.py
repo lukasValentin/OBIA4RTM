@@ -17,7 +17,7 @@ setuptools.setup(name='OBIA4RTM',
       author_email ='graflukas@web.de',
       url = 'https://github.com/lukasValentin/OBIA4RTM',
       include_package_data=True,
-      package_data={'OBIA4RTM': ['postgres.ini', './SQL/Tables/*.sql', './SQL/Queries_Functions/*.sql']},
+      package_data={'OBIA4RTM': ['postgres.ini', 'landcover.cfg', 'prosail.txt', 'soil_relfectance.txt', './SQL/Tables/*.sql', './SQL/Queries_Functions/*.sql']},
       packages=setuptools.find_packages(),
       classifiers = [
         "Programming Language :: Python :: 3",

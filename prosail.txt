@@ -1,0 +1,30 @@
+# Parameters for first land cover class (vegetation)
+#   min     max     num     dist    mean    std     comment
+1.8	1.8	1	0	1.5	0	N
+20	60	40	1	40	15	cab
+ 0	0	1	0	0	0	car
+ 0	1	10	2	0	0	cbrown
+ 0.01	0.01	1	0	0	0	 cw
+ 0.009	0.009	1	0	0	0	cm
+ 0.2	7	40	1	4	2.5	lai
+-0.35	-0.35	1	2	0	0	 lidfa
+-0.15	-0.15	1	0	0	0	lidfb
+ 0.5	0.5	1	0	0	0	rsoil
+ 0.2	0.2	1	0	0	0	psoil
+ 0.01	0.01	1	0	0	0	hspot
+1	1	1	0	0	0	typelidf
+# Parameters for second land cover class (bare soil)
+#   min     max     num     dist    mean    std     comment
+2.8	2.8	1	0	1.5	0	N
+20	60	40	1	40	15	cab
+ 0	0	1	0	0	0	car
+ 0	1	10	2	0	0	cbrown
+ 0.01	0.01	1	0	0	0	 cw
+ 0.009	0.009	1	0	0	0	cm
+ 0.2	7	40	1	4	2.5	lai
+-0.35	-0.35	1	2	0	0	 lidfa
+-0.15	-0.15	1	0	0	0	lidfb
+ 0.5	0.5	1	0	0	0	rsoil
+ 0.2	0.2	1	0	0	0	psoil
+ 0.01	0.01	1	0	0	0	hspot
+1	1	1	0	0	0	typelidf
