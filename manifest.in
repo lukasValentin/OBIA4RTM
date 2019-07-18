@@ -1,6 +1,6 @@
-include postgres.ini
+include /OBIA4RTM/postgres.ini
 include README.md
-include prosail.txt
-include soil_reflectance.txt
-include /SQL/Tables/*.sql
-include /SQL/Queries_Functions/*.sql
+include /OBIA4RTM/prosail.txt
+include /OBIA4RTM/soil_reflectance.txt
+include /OBIA4RTM/SQL/Tables/*.sql
+include /OBIA4RTM/SQL/Queries_Functions/*.sql
