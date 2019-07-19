@@ -1,15 +1,62 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Created on Sat Mar  9 10:34:57 2019
+
+This module is part of OBIA4RTM.
+
+Copyright (c) 2019 Lukas Graf
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+@author: Lukas Graf, graflukas@web.de
+"""
 import sys
 import numpy as np
 from osgeo import ogr, osr, gdal
 import psycopg2
 
 
-def get_mean_refl(shp_file, raster_file, num_bands, acqui_date, conn, cursor,
+def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
                   table_name):
     """
-    calculates mean reflectance per object in image
+    calculates mean reflectance per object in image. Uses GDAL-Python bindings
+    for reading the shape and raster data.
+
+    Parameters
+    ----------
+    shp_file : String
+        file-path to ESRI shapefile with the image object boundaries
+    raster_file : String
+        file-path to raster containing Sentinel-2 imagery as GeoTiff
+    acqui_date : String
+        acquisition date of the imagery (used for linking to LUT and metadata)
+    conn : psycopg2 Database connection
+        connection to OBIA4RTM database
+    cursor : psycopg2 database cursor
+        for querying, updating and inserting into the OBIA4RTM database
+    table_name : String
+        Name of the table the object reflectance values should be written to
+
+    Returns
+    -------
+    None
     """
     # iterate over the shapefile to get the metadata
     # Shapefile handling
@@ -35,9 +82,10 @@ def get_mean_refl(shp_file, raster_file, num_bands, acqui_date, conn, cursor,
     
     # extract the epsg-code
     proj = osr.SpatialReference(wkt=raster.GetProjection())
-    epsg = int(proj.GetAttrValue('AUTHORITY',1))
+    epsg = int(proj.GetAttrValue('AUTHORITY', 1))
     
     # check the image raster
+    num_bands = 9 # Sentinel-2 bands: B2, B3, B4, B5, B6, B7, B8A, B11, B12
     if (raster.RasterCount != num_bands):
         print("ERROR: The number of bands you provided does not match the image file!")
 

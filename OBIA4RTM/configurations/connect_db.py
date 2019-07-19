@@ -70,3 +70,47 @@ def connect_db():
         sys.exit(-1)
     # return conn und cursor objects
     return conn, cursor
+
+
+def get_db_connection_details():
+    """
+    reads and returns the postgres.ini connection details
+    
+    Returns:
+    -------
+    parser : ConfigParser Object
+        parsed database configurations from postgres.ini file
+    """
+    try:
+        # read the connection parameters from config-file (see template postgres.ini)
+        parser = ConfigParser()
+        directory = os.path.dirname(OBIA4RTM.__file__)
+        postgres_init = directory + os.sep + 'postgres.ini'
+        if not os.path.isfile(postgres_init):
+            print('postgres.ini konnte nicht gefunden werden!')
+            sys.exit(-1)
+        parser.read(postgres_init)
+    except (IOError) as err:
+        print ("Reading from postgres.ini failed")
+        print (err)
+        sys.exit(-1)
+    # return conn und cursor objects
+    return parser
+
+
+def close_db_connection(con, cursor):
+    """
+    closes an opened database connection
+
+    Parameters
+    ----------
+    con : psycopg2 Database Connection
+        connection to be closed
+    cursor : psycopg2 Database Cursor
+        cursor to be closed
+    """
+    # check if con is still a valid connection
+    if con is not None:
+        # close first the cursor and then con
+        cursor.close()
+        con.close()

@@ -7,11 +7,11 @@
 --
 CREATE TABLE public.s2_bands
 (
-  	sensor 		CHARACTER VARYING(10) NOT NULL,		-- name of sensor used (e.g Sentinel-2A)
-  	band_alias 	CHARACTER VARYING(10),			-- band alias -> color name (e.g. 'RED'), optional
-  	band_number 	CHARACTER VARYING(10) NOT NULL,		-- band number
-  	central_wvl 	DOUBLE PRECISION NOT NULL,		-- central wavelength of given band (nm)
-  	band_width 	DOUBLE PRECISION NOT NULL,		-- bandwidth of given band (nm)
+  	sensor 		CHARACTER VARYING(10) NOT NULL,		
+  	band_alias 	CHARACTER VARYING(10),			
+  	band_number 	CHARACTER VARYING(10) NOT NULL,		
+  	central_wvl 	DOUBLE PRECISION NOT NULL,		
+  	band_width 	DOUBLE PRECISION NOT NULL,		
   	CONSTRAINT s2_bands_pkey PRIMARY KEY (sensor, band_number)
 )
 WITH (
