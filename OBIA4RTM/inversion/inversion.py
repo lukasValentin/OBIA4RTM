@@ -19,7 +19,7 @@ copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+FITNESS FOR A PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -44,18 +44,31 @@ from OBIA4RTM.mdata_proc.get_scene_metadata import get_sun_zenith_angle
 from OBIA4RTM.mdata_proc.get_scene_metadata import get_sensor_and_sceneid
 from OBIA4RTM.mdata_proc.get_scene_metadata import get_scene_footprint
 from OBIA4RTM.mdata_proc.get_scene_metadata import get_acqusition_time
+from OBIA4RTM.configurations.logger import close_logger
 
 
 class inversion:
     """
     super-class for the object-based inversion of satellite scenes
     """
-    def __init__(self, xml_file, shp, raster):
+    def __init__(self, xml_file, shp, raster, logger):
         """
         class constructor for the inversion class
+
+        Parameters
+        ----------
+        xml_file : String
+            file-path to xml metadata file with Sentinel-2 metadata
+        shp : String
+            file-path to ESRI shapefile with image objects to be inverted
+        raster : String
+            file-path to GeoTiff file with Sentinel-2 imagery to be inverted
+        logger : logging Logger
+            logger object for recording events and errors to log file
         """
         self.shp = shp
         self.raster = raster
+        self.__logger = logger
         self.xml_file = xml_file
         self.__metadata = None
         self.__sensor = None
@@ -65,12 +78,16 @@ class inversion:
         self.__tts, self.__tto, self.__psi = None, None, None
         # setup the DB connection
         self.conn, self.cursor = connect_db.connect_db()
-        print('Connected to PostgreSQL engine sucessfully!')
+        self.__logger.info('Connected to PostgreSQL engine sucessfully!')
+        # determine the directory the configuration files are located
+        obia4rtm_dir = os.path.dirname(OBIA4RTM.__file__)
+        fname = obia4rtm_dir + os.sep + 'OBIA4RTM_HOME'
+        with open(fname, 'r') as data:
+            self.__directory = data.readline()
     # end __init__
 
 
-    @staticmethod
-    def set_ProSAIL_config(path_to_config=None):
+    def set_ProSAIL_config(self,path_to_config=None):
         """
         read in the config file holding the vegetation parameters for
         setting up the lookup table using the ProSAIL radiative transfer
@@ -89,18 +106,17 @@ class inversion:
         # in case path_to_config is None use the default location in the root
         # of OBIA4RTM (prosail.cfg)
         if path_to_config is None:
-            directory = os.path.dirname(OBIA4RTM.__file__)
-            path_to_config = directory + os.sep + 'prosail.txt'
-        if (not os.path.isfile(path_to_config)):
-            print("ERROR: Unable to locate the config file for PROSAIL!")
+            path_to_config = self.__directory + os.sep + 'prosail.txt'
+        if not os.path.isfile(path_to_config):
+            self.__logger.error("Unable to locate the config file for PROSAIL!")
+            close_logger(self.__logger)
             sys.exit(-1)
         # endif
         return path_to_config
     # end set_ProSAIL_config
 
 
-    @staticmethod
-    def set_landcover_config(path_to_lc_config=None):
+    def set_landcover_config(self, path_to_lc_config=None):
         """
         read in the land cover config file holding the land cover classes for
         setting up the lookup table using the ProSAIL radiative transfer
@@ -119,17 +135,17 @@ class inversion:
         # in case path_to_config is None use the default location in the root
         # of OBIA4RTM (prosail.cfg)
         if path_to_lc_config is None:
-            directory = os.path.dirname(OBIA4RTM.__file__)
-            path_to_lc_config = directory + os.sep + 'landcover.cfg'
-        if (not os.path.isfile(path_to_lc_config)):
-            print("ERROR: Unable to locate the config file for land cover classes!")
+            path_to_lc_config = self.__directory + os.sep + 'landcover.cfg'
+        if not os.path.isfile(path_to_lc_config):
+            self.__logger.error("Unable to locate the config file for land cover classes!")
+            close_logger(self.__logger)
             sys.exit(-1)
         # endif
         return path_to_lc_config
     # end set_ProSAIL_config
-    
-    @staticmethod
-    def set_soilrefl(path_to_soilrefl_file=None):
+
+
+    def set_soilrefl(self, path_to_soilrefl_file=None):
         """
         set up the file-path to the txt file containing
         the soil-reflectance required for ProSAIL to account for
@@ -146,10 +162,10 @@ class inversion:
             array of soil reflectance values (1 nm steps)
         """
         if path_to_soilrefl_file is None:
-            directory = os.path.dirname(OBIA4RTM.__file__)
-            path_to_soilrefl_file = directory + os.sep + 'soil_reflectance.txt'
-        if (not os.path.isfile(path_to_soilrefl_file)):
-            print("ERROR: Unable to locate the soil_reflectance.txt file!")
+            path_to_soilrefl_file = self.__directory + os.sep + 'soil_reflectance.txt'
+        if not os.path.isfile(path_to_soilrefl_file):
+            self.__logger.error("Unable to locate the soil_reflectance.txt file!")
+            close_logger(self.__logger)
             sys.exit(-1)
         soils = np.genfromtxt(path_to_soilrefl_file)
         return soils
@@ -165,7 +181,8 @@ class inversion:
         try:
             assert self.__metadata is not None
         except AssertionError:
-            print('Scene metadata could not be read!')
+            self.__logger.error('Scene metadata could not be read!')
+            close_logger(self.__logger)
             sys.exit(-1)
 
 
@@ -229,8 +246,10 @@ class lut_inversion(inversion):
         try:
             self.cursor.execute(statement)
             self.conn.commit()
-        except psycopg2.DatabaseError as err:
-            print(err)
+        except psycopg2.DatabaseError:
+            self.__logger.error('Insert of metadata failed!', exc_info=True)
+            close_logger(self.__logger)
+            sys.exit(-1)
 
 
     def gen_lut(self, inv_table):
@@ -241,7 +260,10 @@ class lut_inversion(inversion):
         # default soil-spectra -> use soil_reflectance fro
         soils = self.set_soilrefl()
         # get S2 sensor-response function
-        resampler = get_resampler(self.conn, self.cursor, self.__sensor)
+        resampler = get_resampler(self.conn,
+                                  self.cursor,
+                                  self.__sensor,
+                                  self.__logger)
 
         # params that could be inverted
         list_of_params = ['n', 'cab', 'car', 'cbrown', 'cw', 'cm', 'lai',
@@ -288,9 +310,11 @@ class lut_inversion(inversion):
             try:
                 self.cursor.execute(insert)
                 self.conn.commit()
-            except psycopg2.DatabaseError as err:
-                print("Failed to insert metadata of inversion process!")
-                print(err)   
+            except psycopg2.DatabaseError:
+                self.__logger.error("Failed to insert metadata of inversion process!",
+                                    exc_info=True)
+                close_logger(self.__logger)
+                sys.exit(-1)
 
             # loop over the parameters stored in the LUT and generate the 
             # according synthetic spectra
@@ -383,7 +407,7 @@ class lut_inversion(inversion):
                     self.cursor.execute(insert_statement)
                     self.conn.commit()
                 except (Exception, psycopg2.DatabaseError):
-                    print("ERROR: INSERT of synthetic spectra failed!")
+                    self.__logger.error("INSERT of synthetic spectra failed!")
                     continue
             # endfor -> lut_table is finished
 
@@ -481,19 +505,20 @@ class lut_inversion(inversion):
                     self.cursor.execute(insert)
                     self.conn.commit()
                 except Exception:
-                    print("ERROR: Insert of results for object {0} failed!".format(
-                            object_id))
+                    self.__logger.error("Insert of results for object {0} failed!".format(
+                            object_id), exc_info=True)
+                    close_logger(self.__logger)
                     return -1
             except Exception:
-                print("Error: No inversion result could be obtained for object {0}".format(
-                        object_id))
+                self.__logger.error("No inversion result could be obtained for object {0}".format(
+                        object_id), exc_info=True)
+                close_logger(self.__logger)
                 return -1
         except Exception as err:
-            
-            print("ERROR: Inverting object with id {0} failed".format(object_id))
-            print(err)
+            self.__logger.error("Inverting object with id {0} failed".format(object_id),
+                                exc_info=True)
+            close_logger(self.__logger)
             return -1
-        
         # return zero if everything was OK
         return 0
     # end function
@@ -513,11 +538,12 @@ class lut_inversion(inversion):
             object_ids = self.cursor.fetchall()
             object_ids = [item[0] for item in object_ids]
             
-        except Exception as err:
-            print("ERROR: Could not query objects for acquistion date {0} and LUC {1}".format(
+        except Exception:
+            self.__logger.error("Could not query objects for acquistion date {0} and LUC {1}".format(
                     acqui_date,
-                    land_use))
-            print(err)
+                    land_use),
+                    exc_info=True)
+            close_logger(self.__logger)
             sys.exit(-1)
         
         # get the list of params to be inverted
@@ -526,7 +552,6 @@ class lut_inversion(inversion):
                         acqui_date,
                         land_use
                         )
-        
         try:
             self.cursor.execute(query)
             params = self.cursor.fetchall()
@@ -543,34 +568,29 @@ class lut_inversion(inversion):
                     params_list.append(band_name)
                 # endfor
             # endif
-            
-        except Exception as err:
-            
-            print("ERROR: Retrieving inversion metadata for acquisition date {0} and LUC {1} failed!".format(
+        except Exception :
+            self.__logger.error("Retrieving inversion metadata for acquisition date {0} and LUC {1} failed!".format(
                     acqui_date,
-                    land_use))
-            print(err)
+                    land_use),
+                    exc_info=True)
+            close_logger(self.__logger)
             sys.exit(-1)
-        
+
         # iterate over all objects to perform the inversion per object
         for ii in range(len(object_ids)):
-            
             object_id = object_ids[ii]
             resrun = self.do_obj_inversion(object_id, acqui_date, land_use, 
                                            num_solutions, params_list, res_table)
-            
-            # in case an error happened
+            # in case an error happened continue with next object
             if resrun != 0:
-                self.conn.rollback()
                 continue
             # endif
         # endfor
-        
+
         # close database connection at the end
         if self.conn is not None:
             self.cursor.close()
             self.conn.close()
         # endif
-    
     # end do_inversion
 # end class

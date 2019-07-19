@@ -121,11 +121,8 @@ class lookup_table:
         products = list(itertools.product(*params_temp))
         # insert the found combinations into the LUT
         for jj in range(self.lut_size):
-            
             for ii in range(self.inv_params):
-                
                 self.lut[self.to_be_inv[0][ii],jj] = products[jj][ii]
-                
             # endfor ii (inv_params)
         # endfor jj (lut_size)
     # end generate_param_lut

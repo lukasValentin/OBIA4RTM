@@ -31,10 +31,11 @@ import sys
 import numpy as np
 from osgeo import ogr, osr, gdal
 import psycopg2
+from OBIA4RTM.configurations.logger import close_logger
 
 
 def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
-                  table_name):
+                  table_name, logger):
     """
     calculates mean reflectance per object in image. Uses GDAL-Python bindings
     for reading the shape and raster data.
@@ -53,6 +54,8 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
         for querying, updating and inserting into the OBIA4RTM database
     table_name : String
         Name of the table the object reflectance values should be written to
+    logger : logging Logger object
+        for tracking the progress and errors
 
     Returns
     -------
@@ -65,8 +68,9 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
     layer = shpfile.GetLayer(0)
     num_objects = layer.GetFeatureCount()
     
-    print(str(num_objects) + " image objects will be processed. This might take a while...") 
-    
+    logger.info("{0} image objects will be processed. This might take a while...".format(
+            num_objects))
+
     # loop over single features
     # get geometry of features and their ID as well as mean reflectane per band
     
@@ -87,7 +91,9 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
     # check the image raster
     num_bands = 9 # Sentinel-2 bands: B2, B3, B4, B5, B6, B7, B8A, B11, B12
     if (raster.RasterCount != num_bands):
-        print("ERROR: The number of bands you provided does not match the image file!")
+        logger.error("The number of bands you provided does not match the image file!")
+        close_logger(logger)
+        sys.exit(-1)
 
     # Get geometry and extent of feature 
     for ii in range(num_objects):
@@ -184,10 +190,10 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
             zoneraster = np.ma.masked_array(dataraster,  np.logical_not(datamask))
             mean = np.nanmean(zoneraster) * 0.01
             meanValues.append(mean)
-        
+            # increment index
             index += 1
         #endfor
-                
+
         #insert the mean reflectane and the object geometry into DB     
         query = "INSERT INTO {0} (object_id, acquisition_date, landuse, object_geom, " \
                 "b2, b3, b4, b5, b6, b7, b8a, b11, b12) VALUES ( " \
@@ -209,17 +215,18 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
                         np.round(meanValues[7], 4),
                         np.round(meanValues[8], 4),
                         )
+        # catch errors for single objects accordingly and continue with next
+        # object to avoid interrupts of whole workflow
         try:
             cursor.execute(query)
             conn.commit()
-            
-        except (psycopg2.DatabaseError, Exception) as err:
-            print("Could not insert image object with ID " + str(f_id) + " into table " + table_name)
-            print(err)
-            #conn.rollback()
+        except (psycopg2.DatabaseError, Exception):
+            logger.error("Could not insert image object with ID {0} into table '{1}'".format(
+                    f_id, table_name), exc_info=True)
+            conn.rollback()
             continue
     #endfor
-    
+
     # close the GDAL-bindings to the files
     raster = None
     shpfile = None

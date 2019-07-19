@@ -29,9 +29,34 @@ SOFTWARE.
 """
 import os
 import logging
+import OBIA4RTM
 
 
-def get_logger(OBIA4RTM_log_dir, logname=None):
+def determine_logdir():
+    """
+    searches the logging directory used for OBIA4RTM
+
+    Returns
+    -------
+    log_dir : String
+        Path of logging directory
+    """
+    obia4rtm_dir = os.path.dirname(OBIA4RTM.__file__)
+    # open the OBIA4RTM_HOME file that tells where to look for the logging
+    # diretory
+    fname = obia4rtm_dir + os.sep + 'OBIA4RTM_HOME'
+    with open(fname, 'r') as data:
+        logging_dir = data.readline()
+    try:
+        assert logging_dir is not None and logging_dir != ''
+    except AssertionError:
+        raise AssertionError
+    logging_dir = logging_dir + os.sep + 'log'
+    # return the logging dir
+    return logging_dir
+
+
+def get_logger(logname=None):
     """
     setups up a new logging object using Rotating File Handlers
 
@@ -47,6 +72,8 @@ def get_logger(OBIA4RTM_log_dir, logname=None):
     logger : logging Logger
         Logger with stream handler for tracing OBIA4RTM's activities and errors
     """
+    # determine the logging directory of OBIA4RTM (somewhere in the user profile)
+    OBIA4RTM_log_dir = determine_logdir()
     # create a new handler for the logging output
     fname = OBIA4RTM_log_dir + os.sep + 'OBIA4RTM.log'
     # use rotating file handler; a new file will be opened when the size
