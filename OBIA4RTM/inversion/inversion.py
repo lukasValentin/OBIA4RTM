@@ -255,6 +255,15 @@ class lut_inversion(inversion):
     def gen_lut(self, inv_table):
         """
         Generates the lookup table and stores it in the DB
+
+        Parameters
+        ----------
+        inv_table : String
+            Name of the table the lookup-table should be written to (without schema)
+
+        Returns:
+        --------
+        None
         """
         # basic setup first
         # default soil-spectra -> use soil_reflectance fro
@@ -277,7 +286,8 @@ class lut_inversion(inversion):
         # read in the landcover class information and the corresponding
         # prosail parameter setup
         params_container = read_params_per_class(prosail_config,
-                                                 landcover_config)
+                                                 landcover_config,
+                                                 self.__logger)
         # extract the land cover classes
         lc_keys = list(params_container.keys())
         # loop over the land cover classes and generate the LUT per class
@@ -422,6 +432,26 @@ class lut_inversion(inversion):
         also inverted spectra can be returned: therefore just append the band
         numbers to the list of strings of parameters:
         e.g. inv_params = ["LAI", "CAB", "B2", "B3", etc.]
+
+        Parameters
+        ----------
+        object_id : Integer
+            ID of the current object (derived from OBIA4RTM database)
+        acqui_date : Date (YYYY-MM-DD)
+            acquisition date of the image used for the inversion
+        lande_use : Integer
+            land cover code for the specific object and date
+        num_solutions : Integer
+            how many solutions should be used for generating the inversion result
+        inv_params : List
+            list of the parameters (must be named) to be inverted
+        res_table : String
+            tablename where to store the results of the inversion
+
+        Returns
+        -------
+        status : Integer
+            zero if everything is OK
         """
         query = """ SELECT 
                         lut.id,
@@ -520,12 +550,33 @@ class lut_inversion(inversion):
             close_logger(self.__logger)
             return -1
         # return zero if everything was OK
-        return 0
+        status = 0
+        return status
     # end function
     
     def do_inversion(self, acqui_date, land_use, num_solutions, res_table, return_specs=True):
         """
-        performs inversion on all objects for a given date
+        performs inversion on all objects for a given date.
+        NOTE: the object reflectance values must be already available in the data
+        base.
+        Works as a wrapper around the do_object_inversion method
+
+        Parameters
+        ----------
+        acqui_date : Date (YYYY-MM-DD)
+            acquisition date of the image used for the inversion
+        lande_use : Integer
+            land cover code for the specific object and date
+        num_solutions : Integer
+            how many solutions should be used for generating the inversion result
+        res_table : String
+            tablename where to store the results of the inversion
+        return_specs : Boolean
+            determines whether inverted spectra should be returned (True; default)
+
+        Returns
+        -------
+        None
         """
         # get list of objects available for a given land use class at a given day
         query = "SELECT DISTINCT object_id FROM s2_obj_spec " \

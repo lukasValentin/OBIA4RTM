@@ -142,8 +142,9 @@ def create_schema():
         # log success
         logger.info("Successfully created table '{0}' in schema '{1}'".format(
                 table_name, schema))
-    # after iterating, the db connection can be close
+    # after iterating, the db connection and the logger can be close
     close_db_connection(con, cursor)
+    close_logger(logger)
     return status
 
 
@@ -172,8 +173,10 @@ def create_sql_statement(sql_file, schema, table_name, logger):
         fopen = open(sql_file, "r")
         lines = fopen.readlines()
         fopen.close()
-    except IOError as err:
-        print('Failed to read the SQL-script\nReason: {}'.format(err))
+    except IOError:
+        logger.error('Failed to read the SQL-script\nReason:', exc_info=True)
+        close_logger(logger)
+        sys.exit(-1)
     # extract the SQL statement
     # '--' indicates comments
     comment = '--'

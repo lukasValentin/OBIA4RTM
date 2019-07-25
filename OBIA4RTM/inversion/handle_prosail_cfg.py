@@ -27,8 +27,10 @@ SOFTWARE.
 
 @author: Lukas Graf, graflukas@web.de
 """
+import sys
 from configparser import ConfigParser
 import numpy as np
+from OBIA4RTM.configurations.logger import close_logger
 
 
 def get_landcover_classes(landcover_cfg):
@@ -55,7 +57,7 @@ def get_landcover_classes(landcover_cfg):
 # end get_landcover_classes
 
 
-def read_params_per_class(prosail_cfg, landcover_cfg):
+def read_params_per_class(prosail_cfg, landcover_cfg, logger):
     """
     reads in the vegetation parameters for the ProSAIL model for each
     land cover class
@@ -64,6 +66,10 @@ def read_params_per_class(prosail_cfg, landcover_cfg):
     ----------
     cfg_file : String
         path to the ProSAIL configurations file
+    landcover_cfg : String
+        path to the landcover configuration file
+    logger : logging.Logger
+        for recording errors
 
     Returns
     -------
@@ -76,10 +82,13 @@ def read_params_per_class(prosail_cfg, landcover_cfg):
     try:
         assert n_classes >= 1
     except AssertionError:
-        print('Error: >=1 land cover class must be provided!')
+        logger.error('Error: >=1 land cover class must be provided!',
+                     exc_info=True)
+        close_logger(logger)
+        sys.exit(-1)
     num_lines_per_luc = 13        # number of lines per land cover class
     offset_rows = 2               # number of rows to be skipped when reading
-    footer_rows = (n_classes - 1) * (num_lines_per_luc + 2)
+    footer_rows = (n_classes - 1) * (num_lines_per_luc)
     # loop over the land cover classes, store results in dictionary
     container = dict()
     try:
@@ -95,6 +104,9 @@ def read_params_per_class(prosail_cfg, landcover_cfg):
             offset_rows =+ num_lines_per_luc + 2
             footer_rows =- (num_lines_per_luc + 2)
     except ValueError:
-        print('Failed to read in the config-File')
+        logger.error('Failed to read in the config-File', exc_info=True)
+        close_logger(logger)
+        sys.exit(-1)
+    return container
 # end read_params_per_class
 
