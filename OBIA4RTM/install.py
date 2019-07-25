@@ -33,6 +33,7 @@ from os.path import expanduser
 from shutil import copyfile
 import OBIA4RTM
 from OBIA4RTM.setup_db.setup_postgres import setupDataBase
+from OBIA4RTM.setup_db.create_schema import create_schema
 
 
 def install():
@@ -81,5 +82,13 @@ def install():
         src = OBIA4RTM_install_dir + os.sep + file
         dst = obia4rtm_dir + os.sep + file
         copyfile(src, dst)
-    # TODO setup schema automatically!
-    print('** Base Setup of OBIA4RTM finished!)
+    print('** Base Setup of OBIA4RTM finished!')
+    # setup a new schema and the schema-specific tables of OBIA4RTM
+    res = create_schema()
+    if res != 0:
+        print('ERROR: Failed to setup a new schema for the OBIA4RTM database! '\
+              'See log-file in {} for more details.'.format(
+                      log_dir))
+    else:
+        print('** Success! OBIA4RTM is now ready for use!\nConfiguration files '\
+              'can be found and modified in {}.'.format(obia4rtm_dir))

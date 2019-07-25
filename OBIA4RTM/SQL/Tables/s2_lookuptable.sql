@@ -3,39 +3,54 @@
 -- allows for storage of multidate lookup-tables 
 -- Lukas Graf, graflukas@web.de
 --
-CREATE TABLE obia4rtm_xx.s2_lut
+CREATE TABLE schema_name.table_name
 (
-	id 			BIGINT NOT NULL, 	-- ID must be unique for each entry in the lookup-table
-  	acquisition_date 	DATE NOT NULL,		-- date of scene acquisition
-  	landuse 		INTEGER DEFAULT 999,	-- land cover code, if 999, no land cover classification is specified
+	id 			BIGINT NOT NULL, 
+  	acquisition_date 	DATE NOT NULL,
+  	landuse 		INTEGER DEFAULT 999,
   -- ProSAIL parameters
-  	n 			DOUBLE PRECISION,	-- mesophyll structure parameter N (-)	
-  	cab 			DOUBLE PRECISION,	-- leaf chlorophyll a+b content (ug/cm²)
-  	car 			DOUBLE PRECISION,	-- leaf carotinoid content (ug/cm²)	
-  	cbrown 			DOUBLE PRECISION,	-- fraction of brown leaves (-)
-  	cw 			DOUBLE PRECISION,	-- leaf equivalent water thickness (cm)
-  	cm 			DOUBLE PRECISION,	-- leaf dry matter content (g/cm²)
-  	lai 			DOUBLE PRECISION,	-- leaf area index (m²/m²)
-  	lidfa 			DOUBLE PRECISION,	-- leaf angle distribution parameter a (-)
-  	lidfb 			DOUBLE PRECISION,	-- leaf angle distribution parameter b (-)
-  	rsoil 			DOUBLE PRECISION,	-- soil brightness parameter r (-)
-  	psoil 			DOUBLE PRECISION,	-- soil brightness parameter p (-)
- 	hspot 			DOUBLE PRECISION,	-- hot spot parameter (-)
+   --n := mesophyll structure parameter N (-)
+   --cab := leaf chlorophyll a+b content (ug/cm²)
+  -- car := leaf carotinoid content (ug/cm²)	
+  -- cbrown = fraction of brown leaves (-)
+  -- cw := leaf equivalent water thickness (cm)
+  -- cm := leaf dry matter content (g/cm²)
+  -- lai := leaf area index (m²/m²)
+  -- lidfa, lidfb := leaf angle distribution parameters
+  -- rsoil, psoil := soil brightness parameters
+  -- hspot : = hot spot parameter (-)
+  -- tts = solar zenith angle (deg)
+  -- tto = observer zenith angle (deg)
+  -- psi = relative azimuth (deg)
+  -- typelidf = type of leaf angle distribution function (instead of lidfa, lidfb)
+  -- b2 - b12 = ProSAIL simulated surface reflectance (%)
+  	n 			DOUBLE PRECISION,
+  	cab 			DOUBLE PRECISION,
+  	car 			DOUBLE PRECISION,
+  	cbrown 			DOUBLE PRECISION,
+  	cw 			DOUBLE PRECISION,
+  	cm 			DOUBLE PRECISION,
+  	lai 			DOUBLE PRECISION,
+  	lidfa 			DOUBLE PRECISION,
+  	lidfb 			DOUBLE PRECISION,
+  	rsoil 			DOUBLE PRECISION,
+  	psoil 			DOUBLE PRECISION,
+ 	hspot 			DOUBLE PRECISION,
   -- viewing and illumination angles (deg)
-  	tts 			DOUBLE PRECISION,	-- solar zenith angle (deg) -> from scene metadata
-  	tto 			DOUBLE PRECISION,	-- observer (=sensor) zenith angle (deg) -> from scene metadata
-  	psi 			DOUBLE PRECISION,	-- relative azimuth angle (deg) -> between sun and sensor
-  	typelidf 		DOUBLE PRECISION,	-- type of leaf distribution function
+  	tts 			DOUBLE PRECISION,
+  	tto 			DOUBLE PRECISION,
+  	psi 			DOUBLE PRECISION,
+  	typelidf 		DOUBLE PRECISION,
   -- simulated Sentinel-2 reflectance values (%)
-  	b2 			DOUBLE PRECISION,	-- Sentinel-2 Band 2 (%)
-  	b3 			DOUBLE PRECISION,	-- Sentinel-2 Band 3 (%)
-  	b4 			DOUBLE PRECISION,	-- Sentinel-2 Band 4 (%)
-  	b5 			DOUBLE PRECISION,	-- Sentinel-2 Band 5 (%)
-  	b6 			DOUBLE PRECISION,	-- Sentinel-2 Band 6 (%)
-  	b7 			DOUBLE PRECISION,	-- Sentinel-2 Band 7 (%)
-  	b8a 			DOUBLE PRECISION,	-- Sentinel-2 Band 8A (%)
-  	b11 			DOUBLE PRECISION,	-- Sentinel-2 Band 11 (%)
-  	b12 			DOUBLE PRECISION,	-- Sentinel-2 Band 12 (%)
+  	b2 			DOUBLE PRECISION,
+  	b3 			DOUBLE PRECISION,
+  	b4 			DOUBLE PRECISION,
+  	b5 			DOUBLE PRECISION,
+  	b6 			DOUBLE PRECISION,
+  	b7 			DOUBLE PRECISION,
+  	b8a 			DOUBLE PRECISION,
+  	b11 			DOUBLE PRECISION,
+  	b12 			DOUBLE PRECISION,
   -- set primary key
   	PRIMARY KEY (id, acquisition_date)
 )
