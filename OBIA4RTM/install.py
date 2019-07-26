@@ -34,14 +34,21 @@ from shutil import copyfile
 import OBIA4RTM
 from OBIA4RTM.setup_db.setup_postgres import setupDataBase
 from OBIA4RTM.setup_db.create_schema import create_schema
+from OBIA4RTM.S2_PreProcessor.install_6S import install_6S
 
 
-def install():
+def install(install_addons=False):
     """
     does a full-installation of OBIA4RTM backend facilities including the
     PostgreSQL database setup and copying of configuration files to a user-
     accessible directory
     NOTE: PostgreSQL must be almost installed as well as PostGIS
+
+    Parameters
+    ----------
+    install_addons : Boolean
+        Def: False; if True 6S for atmospheric correction together with GEE will
+        be installed -> please read the requirements before!
     """
     # firstly, try to setup the Postgres database for the backend
     # NOTE: PostgreSQL must be almost installed as well as PostGIS
@@ -92,3 +99,7 @@ def install():
     else:
         print('** Success! OBIA4RTM is now ready for use!\nConfiguration files '\
               'can be found and modified in {}.'.format(obia4rtm_dir))
+    # in case 6S should be installed, too:
+    if install_addons:
+        print('** Installing 6S addon for atmospheric correction!')
+        install_6S()
