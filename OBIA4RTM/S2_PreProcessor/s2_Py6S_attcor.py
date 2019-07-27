@@ -10,7 +10,6 @@ import datetime
 import math
 import os
 import sys
-import subprocess
 import ee
 from ee.ee_exception import EEException
 import OBIA4RTM
@@ -249,21 +248,31 @@ class s2_Py6S_atcorr:
         s.geometry.day = self.scene_date.day      # month and day used for Earth-Sun distance
         s.altitudes.set_sensor_satellite_level()
         s.altitudes.set_target_custom_altitude(km)
-        self.__logger.info('Atcorr: Starting processing of Sentinel-2 scene!')
+        self.__logger.info('6S: Starting processing of Sentinel-2 scene!')
         # now iterate over the nine relevant Sentinel-2 bands to perform the
         # atmospheric correction and get the surface reflectance
         # go through the spectral bands
         B1_surf = self.surface_reflectance(s, 'B1')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 1!')
         B2_surf = self.surface_reflectance(s, 'B2')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 2!')
         B3_surf = self.surface_reflectance(s, 'B3')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 3!')
         B4_surf = self.surface_reflectance(s, 'B4')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 4!')
         B5_surf = self.surface_reflectance(s, 'B5')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 5!')
         B6_surf = self.surface_reflectance(s, 'B6')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 6!')
         B7_surf = self.surface_reflectance(s, 'B7')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 7!')
         B8A_surf = self.surface_reflectance(s, 'B8A')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 8A!')
         B11_surf = self.surface_reflectance(s, 'B11')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 11!')
         B12_surf = self.surface_reflectance(s, 'B12')
-        self.__logger.info('Atcorr: Finished processing of Sentinel-2 scene!')
+        self.__logger.info('6S: Finished processing Sentinel-2 Band 12!')
+        self.__logger.info('6S: Finished processing of Sentinel-2 scene!')
         # make a stack of the spectral bands
         S2_surf = B1_surf.addBands(B2_surf).addBands(B3_surf).addBands(B4_surf).addBands(B5_surf).addBands(B6_surf).addBands(B7_surf).addBands(B8A_surf).addBands(B11_surf).addBands(B12_surf)
         # return the surface reflectance image

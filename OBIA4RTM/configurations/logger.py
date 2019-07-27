@@ -29,6 +29,7 @@ SOFTWARE.
 """
 import os
 import logging
+import logging.handlers
 import OBIA4RTM
 
 

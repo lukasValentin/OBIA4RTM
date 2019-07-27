@@ -11,6 +11,7 @@ import wget
 import tarfile
 import subprocess
 from urllib.error import HTTPError
+import Py6S
 import OBIA4RTM
 
 
@@ -126,7 +127,7 @@ def install_6S(link=None):
         p = subprocess.run('make')
     except Exception as err:
         print('Make failed!\n{}'.format(err))
-    print('** Make run successfully - Trying to setup symbolic link to 6S binary')
+    print('** Make run successfully completed- Trying to setup symbolic link to 6S binary')
     # finally, create a symbolic link to ensure that the binary can be assessed
     # again, distinguish between Win and Posix
     if platform == 'nt':
@@ -135,6 +136,9 @@ def install_6S(link=None):
         os.system('ln sixsV1.1 /usr/local/bin/sixs')
     # finished
     print('** 6S source code successfully downloaded, unpacked and built!')
+    # testing
+    print('** Running test if 6S Python-Wrapper (Py6S) is working. Output:\n')
+    Py6S.SixS.test()
 
 
 # make the function executable when the module is called from the command line
