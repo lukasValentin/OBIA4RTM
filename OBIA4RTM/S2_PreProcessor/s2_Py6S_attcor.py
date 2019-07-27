@@ -5,13 +5,15 @@ Created on Fri Jul 26 13:45:23 2019
 
 @author: lukas
 """
-from Py6S import PredefinedWavelengths, SixS, Wavelength, AtmosProfile, AeroProfile, Geometry
+from Py6S import PredefinedWavelengths, SixS, Wavelength, AtmosProfile, AeroProfile, Geometry, OutputParsingError
 import datetime
 import math
 import os
 import sys
+import subprocess
 import ee
 from ee.ee_exception import EEException
+import OBIA4RTM
 from OBIA4RTM.S2_PreProcessor.atmospheric import Atmospheric
 from OBIA4RTM.configurations.logger import get_logger, close_logger
 
@@ -29,7 +31,20 @@ class s2_Py6S_atcorr:
         """
         class constructor and basic setup of processing environment
         """
-        sys.path.append(os.path.join(os.path.dirname(os.getcwd()),'bin'))
+        # find the directory the 6S binary has been installed to
+        # this is a sub-directory of the OBIA4RTM_HOME
+        with open(os.path.dirname(OBIA4RTM.__file__) + os.sep + 'OBIA4RTM_HOME',
+                  'r') as data:
+            obia4rtm_dir = data.readline()
+        self.sixS_install_dir = obia4rtm_dir + os.sep + 'sixS'+  os.sep + 'src' + os.sep + '6SV1.1'
+        # make sure that 6S is installed
+        if not os.path.isdir(self.sixS_install_dir):
+            print("Error: 6S is not installed on your computer or cannot be found!\n"\
+                  "Expected installation location: '{}'\n"\
+                  "You might want to run OBIA4RTM.S2_PreProcessor.install_6S "\
+                  "for installing 6S".format(self.sixS_install_dir))
+        # add this directory of 6S binary to system path temporally (does not work properly)
+        # sys.path.append(sixS_install_dir)
         # get a logger for recording sucess and error messages
         self.__logger = get_logger()
         self.__logger.info('Setting up Google EE environment for Sentinel-2 '\
@@ -44,10 +59,10 @@ class s2_Py6S_atcorr:
         # for storing the metadata
         self.info = None
         # for the image object
-        self.__S2 = None
+        self.S2 = None
         # for the solar zenith angle and the scene timestamp
-        self.__solar_z = None
-        self.__scene_date = None
+        self.solar_z = None
+        self.scene_date = None
 
 
     @staticmethod
@@ -105,13 +120,13 @@ class s2_Py6S_atcorr:
         solar_z = self.info['MEAN_SOLAR_ZENITH_ANGLE']
         solar_angle_correction = math.cos(math.radians(solar_z))
         # Earth-Sun distance (from day of year)
-        doy = self.__scene_date.timetuple().tm_yday
+        doy = self.scene_date.timetuple().tm_yday
         # http://physics.stackexchange.com/questions/177949/earth-sun-distance-on-a-given-day-of-the-year
         d = 1 - 0.01672 * math.cos(0.9856 * (doy-4))
         # conversion factor
         multiplier = ESUN*solar_angle_correction/(math.pi*d**2)
         # top of atmosphere reflectance
-        toa = self.__S2.divide(10000)
+        toa = self.S2.divide(10000)
         # at-sensor radiance
         rad = toa.select(bandname).multiply(multiplier)
         return rad
@@ -137,14 +152,20 @@ class s2_Py6S_atcorr:
         """
         # run 6S for this waveband
         s.wavelength = self.spectralResponseFunction(bandname)
-        s.run()
-        # extract 6S outputs
-        Edir = s.outputs.direct_solar_irradiance             #direct solar irradiance
-        Edif = s.outputs.diffuse_solar_irradiance            #diffuse solar irradiance
-        Lp   = s.outputs.atmospheric_intrinsic_radiance      #path radiance
-        absorb  = s.outputs.trans['global_gas'].upward       #absorption transmissivity
-        scatter = s.outputs.trans['total_scattering'].upward #scattering transmissivity
-        tau2 = absorb * scatter                              #total transmissivity
+        try:
+            s.run()
+            # extract 6S outputs
+            Edir = s.outputs.direct_solar_irradiance             #direct solar irradiance
+            Edif = s.outputs.diffuse_solar_irradiance            #diffuse solar irradiance
+            Lp   = s.outputs.atmospheric_intrinsic_radiance      #path radiance
+            absorb  = s.outputs.trans['global_gas'].upward       #absorption transmissivity
+            scatter = s.outputs.trans['total_scattering'].upward #scattering transmissivity
+            tau2 = absorb * scatter                              #total transmissivity
+        except OutputParsingError:
+            self.__logger.error('Failed to read 6S outputs!',
+                                exc_info=True)
+            close_logger(self.__logger)
+            sys.exit(-1)
         # radiance to surface reflectance
         rad = self.toa_to_rad(bandname)
         ref = rad.subtract(Lp).multiply(math.pi).divide(tau2*(Edir+Edif))
@@ -171,7 +192,7 @@ class s2_Py6S_atcorr:
         """
         date = ee.Date(acqui_date)
         # get the Sentinel-2 image at or immediately after the specified date
-        self.__S2 = ee.Image(
+        self.S2 = ee.Image(
                 ee.ImageCollection('COPERNICUS/S2')
                 .filterBounds(geom)
                 .filterDate(date,date.advance(3,'month'))
@@ -179,11 +200,11 @@ class s2_Py6S_atcorr:
                 .first()
                 )
         # extract the relevant metadata for carrying out the atmospheric correction
-        self.info = self.__S2.getInfo()['properties']
+        self.info = self.S2.getInfo()['properties']
         # get the solar zenith angle an the scene data
-        self.__scene_date = datetime.datetime.utcfromtimestamp(
+        self.scene_date = datetime.datetime.utcfromtimestamp(
                     self.info['system:time_start']/1000)
-        self.__solar_z = self.info['MEAN_SOLAR_ZENITH_ANGLE']
+        self.solar_z = self.info['MEAN_SOLAR_ZENITH_ANGLE']
         # log the identifier of the processed scene
         scene_id = self.info.get('DATASTRIP_ID')
         self.__logger.info("Starting Processing scene '{}' using GEE and Py6S".format(
@@ -196,7 +217,7 @@ class s2_Py6S_atcorr:
         # get the average altitude of the region to be processed
         # for the Digital Elevation Model (DEM) the Shuttle Radar Topography
         # Mission (SRTM) is used (Version 4) as it covers most parts of the
-        # Earth
+        # Earth (90 arc-sec data is used)
         SRTM = ee.Image('CGIAR/SRTM90_V4')
         alt = SRTM.reduceRegion(reducer = ee.Reducer.mean(),
                                 geometry = geom.centroid()).get('elevation').getInfo()
@@ -207,7 +228,14 @@ class s2_Py6S_atcorr:
         # Py6S uses units of kilometers
         km = alt/1000
         # create a 6S object from the Py6S class
-        # Instantiate
+        # Instantiate (use the explizit path to installation directory of the
+        # 6S binary as otherwise there might be an error)
+        # also make the 6S binary executable (Posix only)
+#        if os.platform != 'nt':
+#            sixS_bin = self.sixS_install_dir + os.sep + 'sixsV1.1'
+#            shell = '/chmod +x {}'.format(sixS_bin)
+#            subprocess.call(shell)
+#        s = SixS(self.sixS_install_dir)
         s = SixS()
         # Atmospheric constituents
         s.atmos_profile = AtmosProfile.UserWaterAndOzone(h2o,o3)
@@ -216,9 +244,9 @@ class s2_Py6S_atcorr:
         # Earth-Sun-satellite geometry
         s.geometry = Geometry.User()
         s.geometry.view_z = 0                       # always NADIR (simplification!)
-        s.geometry.solar_z = self.__solar_z         # solar zenith angle
-        s.geometry.month = self.__scene_date.month  # month and day used for Earth-Sun distance
-        s.geometry.day = self.__scene_date.day      # month and day used for Earth-Sun distance
+        s.geometry.solar_z = self.solar_z         # solar zenith angle
+        s.geometry.month = self.scene_date.month  # month and day used for Earth-Sun distance
+        s.geometry.day = self.scene_date.day      # month and day used for Earth-Sun distance
         s.altitudes.set_sensor_satellite_level()
         s.altitudes.set_target_custom_altitude(km)
         self.__logger.info('Atcorr: Starting processing of Sentinel-2 scene!')
@@ -239,4 +267,5 @@ class s2_Py6S_atcorr:
         # make a stack of the spectral bands
         S2_surf = B1_surf.addBands(B2_surf).addBands(B3_surf).addBands(B4_surf).addBands(B5_surf).addBands(B6_surf).addBands(B7_surf).addBands(B8A_surf).addBands(B11_surf).addBands(B12_surf)
         # return the surface reflectance image
+        close_logger(self.__logger)
         return S2_surf

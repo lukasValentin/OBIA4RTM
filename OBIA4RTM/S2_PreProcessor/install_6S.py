@@ -52,6 +52,7 @@ def install_6S(link=None):
     except FileExistsError as err:
         print('Failed to create directory for installing 6S!\n{}'.format(
                 err))
+    print('** Setup installation into {}'.format(six6_dir))
     # now the 6S source code can be downloaded (link last tested on 26th Jul 2019)
     # if this link is not working any longer, you can provide an alternative link
     # in the function call interface
@@ -78,11 +79,11 @@ def install_6S(link=None):
 # =============================================================================
 #     # now, the makefile must be altered to set the correct compiler option
 #     # determine the OS as there are different ways to go for Win and posix
-#     platform = os.name
+    platform = os.name
+    with open('Makefile','r') as makefile:
+             lines = makefile.readlines()
     if platform == 'nt':
          # Windows
-         with open('Makefile','r') as makefile:
-             lines = makefile.readlines()
          # iterate over the lines to determine and alter the FC flag
          line_number = 0
          for line in lines:
@@ -99,13 +100,18 @@ def install_6S(link=None):
          # Linux and Mac OS X
          # this option will ONLY work under Linux, Unix and OS X given that
          # gfortran is available
-         
+        # iterate over the lines to determine and alter the FC flag
+         line_number = 0
+         for line in lines:
+             line_number += 1
+             if (line.startswith('FC')):
+                 break
          # keep the previuos and following lines and only alter the 'FC' line
          prev_lines = lines[0:line_number-1]
          foll_lines = lines[line_number::]
          # instead of the old argument of the 'FC', this expression is required
          # according to https://py6s.readthedocs.io/en/latest/installation.html
-         line = 'FC      = gfortran -std=legacy -ffixed-line-length-none'
+         line = 'FC      = gfortran -std=legacy -ffixed-line-length-none -ffpe-summary=none $(FFLAGS)\n'
     # delete the old Makefile
     os.remove('Makefile')
     # no write to the new makefile
@@ -116,8 +122,21 @@ def install_6S(link=None):
 # =============================================================================
     # run the make file (NOTE: make mus be installed on Win seperately!)
     try:
+        print('** Running make to build the executable')
         p = subprocess.run('make')
     except Exception as err:
         print('Make failed!\n{}'.format(err))
-    print('** 6S source code successfully downloaded, unpacked and built!')
+    print('** Make run successfully - Trying to setup symbolic link to 6S binary')
+    # finally, create a symbolic link to ensure that the binary can be assessed
+    # again, distinguish between Win and Posix
+    if platform == 'nt':
+        os.system('MKLINK sixsV1.1.exe C:\Windows\System')
+    else:
+        os.system('ln sixsV1.1 /usr/local/bin/sixs')
     # finished
+    print('** 6S source code successfully downloaded, unpacked and built!')
+
+
+# make the function executable when the module is called from the command line
+if __name__ == '__main__':
+    install_6S()
