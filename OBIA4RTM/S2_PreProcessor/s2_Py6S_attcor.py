@@ -15,6 +15,9 @@ For setting up the Python Client API please see:
 
 Copyright (c) Sam Murphy (https://github.com/samsammurphy)
 
+Slight changes from the original source code were made (class structure);
+functionalities themselves have not been altered
+
 Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -226,6 +229,7 @@ import ee
 from ee.ee_exception import EEException
 import OBIA4RTM
 from OBIA4RTM.S2_PreProcessor.atmospheric import Atmospheric
+from OBIA4RTM.S2_PreProcessor.cloud_masking import mask_clouds
 from OBIA4RTM.configurations.logger import get_logger, close_logger
 
 
@@ -336,10 +340,8 @@ class s2_Py6S_atcorr:
         d = 1 - 0.01672 * math.cos(0.9856 * (doy-4))
         # conversion factor
         multiplier = ESUN*solar_angle_correction/(math.pi*d**2)
-        # top of atmosphere reflectance
-        toa = self.S2.divide(10000)
         # at-sensor radiance
-        rad = toa.select(bandname).multiply(multiplier)
+        rad = self.S2.select(bandname).multiply(multiplier)
         return rad
 
 
@@ -438,15 +440,14 @@ class s2_Py6S_atcorr:
         self.__logger.info(message)
         # Py6S uses units of kilometers
         km = alt/1000
+        # mask out clouds and cirrus from the imagery using the cloud scor
+        # algorithm provided by Sam Murhpy under Apache 2.0 licence
+        # see: https://github.com/samsammurphy/cloud-masking-sentinel2/blob/master/cloud-masking-sentinel2.ipynb
+        # also converts the image values to top-of-atmosphere reflectance
+        self.S2 = mask_clouds(self.S2, option=1)
         # create a 6S object from the Py6S class
         # Instantiate (use the explizit path to installation directory of the
         # 6S binary as otherwise there might be an error)
-        # also make the 6S binary executable (Posix only)
-#        if os.platform != 'nt':
-#            sixS_bin = self.sixS_install_dir + os.sep + 'sixsV1.1'
-#            shell = '/chmod +x {}'.format(sixS_bin)
-#            subprocess.call(shell)
-#        s = SixS(self.sixS_install_dir)
         s = SixS()
         # Atmospheric constituents
         s.atmos_profile = AtmosProfile.UserWaterAndOzone(h2o,o3)
