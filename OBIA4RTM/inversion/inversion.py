@@ -87,7 +87,7 @@ class inversion:
     # end __init__
 
 
-    def set_ProSAIL_config(self,path_to_config=None):
+    def set_ProSAIL_config(self, path_to_config=None):
         """
         read in the config file holding the vegetation parameters for
         setting up the lookup table using the ProSAIL radiative transfer
@@ -508,21 +508,19 @@ class lut_inversion(inversion):
                 mean_params = self.cursor.fetchall()
                 # convert result to dictionary for storing results in DB
                 result_dict = dict()
-                
+
                 index = 0
                 for param in inv_params:
                     result_dict[param] = mean_params[0][index]
                     index += 1
-                
                 # also store the errors
                 error_dict = dict()
                 for ii in range(num_solutions):
                     error_dict[str(ii+1)] = rmse_vals[ii]
-                
                 # convert to json
                 result_json = json.dumps(result_dict)
                 error_json = json.dumps(error_dict)
-                
+
                 # insert statement
                 insert = "INSERT INTO {0} VALUES ({1}, '{2}', '{3}', '{4}');".format(
                         res_table,
@@ -553,7 +551,8 @@ class lut_inversion(inversion):
         status = 0
         return status
     # end function
-    
+
+
     def do_inversion(self, acqui_date, land_use, num_solutions, res_table, return_specs=True):
         """
         performs inversion on all objects for a given date.

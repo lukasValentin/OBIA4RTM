@@ -36,6 +36,9 @@ from OBIA4RTM.configurations.logger import get_logger, close_logger
 from OBIA4RTM.configurations.connect_db import connect_db, close_db_connection
 
 
+sys_exit_message = 'An error occured during setup of new Postgres schema. Check log!'
+
+
 def create_schema():
     """
     this function is used to generate a new schema in the OBIA4RTM database.
@@ -72,7 +75,7 @@ def create_schema():
         logger.error('Cannot read obia4rtm_backend.cfg from {}!'.format(
                 obia4rtm_home))
         close_logger(logger)
-        sys.exit(-1)
+        sys.exit(sys_exit_message)
     # now, the cfg information can be read in using the configParser class
     parser = ConfigParser()
     try:
@@ -90,12 +93,32 @@ def create_schema():
         logger.error('The version of your obia4rtm_backend.cfg file seems to be corrupt!',
                      exc_info=True)
         close_logger(logger)
-        sys.exit(-1)
+        sys.exit(sys_exit_message)
     # if the schema name is OK, the schema can be created
     # if the schema already exists in the current database, nothing will happen
     sql = 'CREATE SCHEMA IF NOT EXISTS {};'.format(schema)
     cursor.execute(sql)
     con.commit()
+    # enable PostGIS and HSTORE extension
+    # enable the PostGIS extension
+    sql = "CREATE EXTENSION PostGIS;"
+    try:
+        cursor.execute(sql)
+        con.commit()
+    except (ProgrammingError, DatabaseError):
+        logger.error("PostGIS setup failed!", exc_info=True)
+        close_logger(logger)
+        sys.exit()
+    # enable the HSTORE extension
+    sql = "CREATE EXTENSION HSTORE;"
+    try:
+        cursor.execute(sql)
+        con.commit()
+    except (ProgrammingError, DatabaseError):
+        logger.error("HSTORE setup failed!", exc_info=True)
+        close_logger(logger)
+        sys.exit(sys_exit_message)
+
     logger.info("Successfully created schema '{}' in current OBIA4RTM database!".format(
             schema))
     # after that the schema-specific tables are created that are required
@@ -138,7 +161,7 @@ def create_schema():
             logger.error("Creating table '{0}' in schema '{1}' failed!".format(
                     table_name, schema), exc_info=True)
             close_logger(logger)
-            sys.exit(-1)
+            sys.exit(sys_exit_message)
         # log success
         logger.info("Successfully created table '{0}' in schema '{1}'".format(
                 table_name, schema))
@@ -176,7 +199,7 @@ def create_sql_statement(sql_file, schema, table_name, logger):
     except IOError:
         logger.error('Failed to read the SQL-script\nReason:', exc_info=True)
         close_logger(logger)
-        sys.exit(-1)
+        sys.exit(sys_exit_message)
     # extract the SQL statement
     # '--' indicates comments
     comment = '--'
