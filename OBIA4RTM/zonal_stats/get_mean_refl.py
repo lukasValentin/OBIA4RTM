@@ -30,7 +30,7 @@ SOFTWARE.
 import sys
 import numpy as np
 from osgeo import ogr, osr, gdal
-import psycopg2
+from psycopg2 import DatabaseError, ProgrammingError
 from OBIA4RTM.configurations.logger import close_logger
 
 
@@ -67,7 +67,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
     shpfile = driver.Open(shp_file)
     layer = shpfile.GetLayer(0)
     num_objects = layer.GetFeatureCount()
-    
+
     logger.info("{0} image objects will be processed. This might take a while...".format(
             num_objects))
 
@@ -87,6 +87,26 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
     # extract the epsg-code
     proj = osr.SpatialReference(wkt=raster.GetProjection())
     epsg = int(proj.GetAttrValue('AUTHORITY', 1))
+    # check with the epsg of the shapefile
+    ref = layer.GetSpatialRef()
+    if ref is None:
+        logger.warning('The layer has no projection info! Assume it is the same'\
+                       'as for the imagery - but check results!')
+        shp_epsg = epsg
+    else:
+        code = ref.GetAuthorityCode(None)
+        shp_epsg = int(code)
+
+    # check if the raster and the shapefile epsg match
+    if epsg != shp_epsg:
+        logger.error('The projection of the imagery does not match the projection '\
+                     'of the shapefile you provided!'\
+                     'EPSG-Code of the Image: EPSG:{0}; '\
+                     'EPSG-Code of the Shapefile: EPSG:{1}'.format(
+                             epsg,
+                             shp_epsg))
+        close_logger(logger)
+        sys.exit('An error occured while execute get_mean_refl. Check logfile!')
     
     # check the image raster
     num_bands = 9 # Sentinel-2 bands: B2, B3, B4, B5, B6, B7, B8A, B11, B12
@@ -95,16 +115,37 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
         close_logger(logger)
         sys.exit(-1)
 
+    # determine the min area of an object (determined by S2 spatial resolution)
+    # use the "standard" resolution of 20 meters
+    # an object must be twice times larger
+    min_area = 20 * 60 * 2
+
+    # for requesting the landuse information
+    luc_field = 'LU' + acqui_date.replace('-', '')
     # Get geometry and extent of feature 
     for ii in range(num_objects):
-        
         feature = layer.GetFeature(ii)
+        # extract the geometry
         geom = feature.GetGeometryRef()
         # get well-known-text of feature geomtry
-        wkt = geom.ExportToWkt()  
+        wkt = geom.ExportToWkt()
+        # extract feature ID
         f_id = feature.GetFID()
-        luc = feature.GetField(acqui_date)
-        
+        # get the area of the current feature
+        area = geom.Area()  # m2
+        # the area must be at least 2.5 times larger than the coarsest
+        # possible spatial resolution of Sentinel-2 (60 by 60 meters)
+        if area < min_area:
+            logger.warning('The object {0} was too small compared to the '\
+                           'spatial resolution of Sentinel-2! '\
+                           'Object area (m2): {1}; Minimum area required (m2): '\
+                           '{2} -> skipping'.format(
+                                   f_id,
+                                   area,
+                                   min_area))
+            continue
+        luc = feature.GetField(luc_field)
+
         # convert to integer coding if luc is provided as text
         try:
             luc = int(luc)
@@ -116,7 +157,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
             res = cursor.fetchall()
             luc = int(res[0][0])
         # end try-except
-        
+
         # check for feature type -> could be either POLYGON or MULTIPOLYGON
         if (geom.GetGeometryName() == 'MULTIPOLYGON'):
             count = 0
@@ -188,13 +229,15 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
 
             # Mask zone of raster
             zoneraster = np.ma.masked_array(dataraster,  np.logical_not(datamask))
+            # apply conversion factor of 0.01 to get the correct reflectance
+            # values for ProSAIL
             mean = np.nanmean(zoneraster) * 0.01
             meanValues.append(mean)
             # increment index
             index += 1
         #endfor
 
-        #insert the mean reflectane and the object geometry into DB     
+        #insert the mean reflectane and the object geometry into DB
         query = "INSERT INTO {0} (object_id, acquisition_date, landuse, object_geom, " \
                 "b2, b3, b4, b5, b6, b7, b8a, b11, b12) VALUES ( " \
                 "{1}, '{2}', {3}, ST_Multi(ST_GeometryFromText('{4}', {5})), " \
@@ -220,7 +263,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
         try:
             cursor.execute(query)
             conn.commit()
-        except (psycopg2.DatabaseError, Exception):
+        except (DatabaseError, ProgrammingError):
             logger.error("Could not insert image object with ID {0} into table '{1}'".format(
                     f_id, table_name), exc_info=True)
             conn.rollback()

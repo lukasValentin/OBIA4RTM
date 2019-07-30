@@ -425,18 +425,17 @@ def mask_clouds(s2_image, option):
     if option == 1:
         toa = ESAcloudMask(toa)
         toa = shadowMask(toa,'ESA_clouds')
-        toa = toa.updateMask(toa.select('ESA_clouds'))
-        toa = toa.updateMask(toa.select('shadows'))
+        # reformat the output
+        toa = toa.select(
+            ['aerosol','blue', 'green', 'red', 'B5', 'red2', 'B7', 'red4','h2o', 'cirrus','swir1', 'swir2','ESA_clouds', 'shadows'],
+    ['B1','B2','B3','B4','B5','B6','B7','B8A','B9','B10', 'B11','B12','CloudMask','ShadowMask'])
     elif option == 2:
         toa = sentinelCloudScore(toa)
         toa = shadowMask(toa,'cloudScore')
-        toa = toa.updateMask(toa.select('cloudScore'))
-        toa = toa.updateMask(toa.select('shadows'))
+        toa = toa.select(
+            ['aerosol','blue', 'green', 'red', 'B5', 'red2', 'B7', 'red4','h2o', 'cirrus','swir1', 'swir2', 'cloudScore', 'shadows'],
+    ['B1','B2','B3','B4','B5','B6','B7','B8A','B9','B10', 'B11','B12','CloudMask','ShadowMask'])
     else:
         raise NotImplemented
 
-    # reformat the output
-    toa = toa.select(
-            ['aerosol','blue', 'green', 'red', 'B5', 'red2', 'B7', 'red4','h2o', 'cirrus','swir1', 'swir2'],
-    ['B1','B2','B3','B4','B5','B6','B7','B8A','B9','B10', 'B11','B12'])
     return toa

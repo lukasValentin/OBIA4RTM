@@ -385,7 +385,7 @@ class s2_Py6S_atcorr:
         return ref
 
 
-    def run_py6s(self, geom, acqui_date):
+    def run_py6s(self, geom, acqui_date, option=1):
         """
         runs the 6S algorithm for atmospheric correction on a user-defined
         geometry and date on Sentinel-2 imagery
@@ -397,11 +397,18 @@ class s2_Py6S_atcorr:
             Google EE geometry specify the geographic extent to be processed
         acqui_date : String
             date (YYYY-MM-dd) of the desired scene to be processed
+        option : Integer
+            for computing the cloud mask the user can decide whether the
+            ESA delivered quality layer should be used for cloud masking
+            (option=1) or an alternative approach originally developed for
+            Landsat TM (option=2) should be used (Def=1)
 
         Returns
         -------
         s2_surf : ee.image.Image
             Google EE image instance with surface reflectance values
+            and two additional bands containing Clouds ('CloudMask') and
+            detected cloud shadows ('CloudShadows')
         """
         date = ee.Date(acqui_date)
         # get the Sentinel-2 image at or immediately after the specified date
@@ -440,11 +447,14 @@ class s2_Py6S_atcorr:
         self.__logger.info(message)
         # Py6S uses units of kilometers
         km = alt/1000
-        # mask out clouds and cirrus from the imagery using the cloud scor
+        # mask out clouds and cirrus from the imagery using the cloud score
+        # optionally
         # algorithm provided by Sam Murhpy under Apache 2.0 licence
         # see: https://github.com/samsammurphy/cloud-masking-sentinel2/blob/master/cloud-masking-sentinel2.ipynb
         # also converts the image values to top-of-atmosphere reflectance
+        self.__logger.info('Calculating cloud and shadow mask')
         self.S2 = mask_clouds(self.S2, option=1)
+        self.__logger.info('Finished calculating cloud and shadow mask')
         # create a 6S object from the Py6S class
         # Instantiate (use the explizit path to installation directory of the
         # 6S binary as otherwise there might be an error)
@@ -465,8 +475,6 @@ class s2_Py6S_atcorr:
         # now iterate over the nine relevant Sentinel-2 bands to perform the
         # atmospheric correction and get the surface reflectance
         # go through the spectral bands
-        B1_surf = self.surface_reflectance(s, 'B1')
-        self.__logger.info('6S: Finished processing Sentinel-2 Band 1!')
         B2_surf = self.surface_reflectance(s, 'B2')
         self.__logger.info('6S: Finished processing Sentinel-2 Band 2!')
         B3_surf = self.surface_reflectance(s, 'B3')
@@ -487,7 +495,11 @@ class s2_Py6S_atcorr:
         self.__logger.info('6S: Finished processing Sentinel-2 Band 12!')
         self.__logger.info('6S: Finished processing of Sentinel-2 scene!')
         # make a stack of the spectral bands
-        S2_surf = B1_surf.addBands(B2_surf).addBands(B3_surf).addBands(B4_surf).addBands(B5_surf).addBands(B6_surf).addBands(B7_surf).addBands(B8A_surf).addBands(B11_surf).addBands(B12_surf)
+        # also add the computed cloud and shadow mask
+        cm = self.S2.select('CloudMask')
+        sm = self.S2.select('ShadowMask')
+        S2_surf = B2_surf.addBands(B3_surf).addBands(B4_surf).addBands(B5_surf).addBands(B6_surf).addBands(B7_surf).addBands(B8A_surf).addBands(B11_surf).addBands(B12_surf).addBands(cm).addBands(sm)
+
         # return the surface reflectance image
         close_logger(self.__logger)
         return S2_surf
