@@ -27,6 +27,12 @@ Workflow
 
 The overall workflow implemented in OBIA4RTM is shown below.
 
+## Inputs
+
+OBIA4RTM currently expects **Sentinel-2** imagery in **Level-2A** (i.e. corrected for atmospheric effects). Per default it is assumed that Sen2Core was used for generating the Level-2A data (see: http://step.esa.int/main/third-party-plugins-2/sen2cor/) or data was almost downloaded in this processing level from Copernicus or any other (national) data hub.
+
+Optionally, preprocessing can be done using **Google Earth Engine** that is available as an **`addon`**.
+
 ![OBIA4RTM Workflow](https://github.com/lukasValentin/OBIA4RTM/blob/master/OBIA4RTM_Workflow.gif "OBIA4RTM Workflow Overview")
 
 
@@ -55,6 +61,32 @@ Band Number  |	Central wavelength (nm)	|  Bandwidth (nm)  |  Spatial resolution 
 - concurrently, OBIA4RTM uses the Root Mean Squared Error (RMSE) as cost function within the inversion strategy. Users can specify their own cost-functions. It is planned to add more cost functions in the future.
 
 - all image objects are stored in a PostgreSQL database with PostGIS extension. Make sure to have PostgreSQL **and** PostGIS installed on your machine or where-ever you want to run OBIA4RTM.
+
+Installation
+------------
+
+tbd
+
+Usage Instructions
+------------------
+
+tbd
+
+Addons
+------
+
+To enable *operational usage* of OBIA4RTM, **preprocessing opportunities** are offered using **`Google Earth Engine (Python API client)`**. This includes atmospheric correction using **Py6S** as well as cloud and cloud shadow masking using functionalities provided by Sam Murphy under Apache 2.0 license.
+Check out
+
+- https://github.com/samsammurphy/gee-atmcorr-S2 for the atmospheric correction algorithm, and
+
+- https://github.com/samsammurphy/cloud-masking-sentinel2 for the cloud and shadow masking
+
+The preprocessed images are then stored and treated the same way in OBIA4RTM as in the file- (Sen2Core) based way.
+
+For demonstration, some sample code is available in a Jupyter Notebook https://github.com/lukasValentin/OBIA4RTM/tree/master/Examples/jupyter
+
+**NOTE**: Please make sure to follow the installation instructions before running this functionality and having the Google Earth Engine client enabled.
 
 
 Demodata produced with OBIA4RTM

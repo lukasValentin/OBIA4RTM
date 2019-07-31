@@ -152,11 +152,5 @@ def parse_gee_metadata(gee_metadata):
     metadata['SOLAR_IRRADIANCE_B8A'] = gee_metadata['SOLAR_IRRADIANCE_B8A']
     metadata['SOLAR_IRRADIANCE_B11'] = gee_metadata['SOLAR_IRRADIANCE_B11']
     metadata['SOLAR_IRRADIANCE_B12'] = gee_metadata['SOLAR_IRRADIANCE_B12']
-    
-    
-    
-    
-    
-    
-    
-     
+
+    return metadata
