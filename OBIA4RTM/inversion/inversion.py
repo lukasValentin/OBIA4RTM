@@ -39,6 +39,7 @@ import OBIA4RTM.inversion.lookup_table as lut
 from OBIA4RTM.inversion.handle_metadata import get_resampler
 from OBIA4RTM.inversion.handle_prosail_cfg import read_params_per_class
 from OBIA4RTM.mdata_proc.parse_s2xml import parse_s2xml
+from OBIA4RTM.mdata_proc.handle_gee_metadata import parse_gee_metadata
 from OBIA4RTM.mdata_proc.get_scene_metadata import get_mean_angles
 from OBIA4RTM.mdata_proc.get_scene_metadata import get_sun_zenith_angle
 from OBIA4RTM.mdata_proc.get_scene_metadata import get_sensor_and_sceneid
@@ -47,11 +48,15 @@ from OBIA4RTM.mdata_proc.get_scene_metadata import get_acqusition_time
 from OBIA4RTM.configurations.logger import close_logger
 
 
+error_message = 'An error occured during the inversion process. Check log.'
+
+
 class inversion:
     """
     super-class for the object-based inversion of satellite scenes
     """
-    def __init__(self, xml_file, shp, raster, logger):
+    def __init__(self, xml_file, shp, raster, logger, use_gee=False,
+                 gee_metadata=None):
         """
         class constructor for the inversion class
 
@@ -65,6 +70,17 @@ class inversion:
             file-path to GeoTiff file with Sentinel-2 imagery to be inverted
         logger : logging Logger
             logger object for recording events and errors to log file
+        use_gee : Boolean
+            specifies if Google-Earth engine was used for preprocessing or not
+            Def = False; in case it is True, some modifications in the metadata
+            processing apply
+        gee_metadata : Dictionary
+            GEE derived metadata in case GEE was used. In this case, the
+            metadata dict MUST be provided
+
+        Returns
+        -------
+        None
         """
         self.shp = shp
         self.raster = raster
@@ -84,6 +100,20 @@ class inversion:
         fname = obia4rtm_dir + os.sep + 'OBIA4RTM_HOME'
         with open(fname, 'r') as data:
             self.__directory = data.readline()
+        # check if Google Earth Engine was used and everything is correct
+        if use_gee:
+            try:
+                assert gee_metadata is not None
+            except AssertionError:
+                self.__logger.error('GEE should be used but input is incorrect!',
+                                    exc_info=True)
+                close_logger(self.__logger)
+                sys.exit(error_message)
+
+        self.__use_gee = use_gee
+        self.__gee_metadata = gee_metadata
+        # standard metadata
+        self.__metadata = None
     # end __init__
 
 
@@ -110,7 +140,7 @@ class inversion:
         if not os.path.isfile(path_to_config):
             self.__logger.error("Unable to locate the config file for PROSAIL!")
             close_logger(self.__logger)
-            sys.exit(-1)
+            sys.exit(error_message)
         # endif
         return path_to_config
     # end set_ProSAIL_config
@@ -139,7 +169,7 @@ class inversion:
         if not os.path.isfile(path_to_lc_config):
             self.__logger.error("Unable to locate the config file for land cover classes!")
             close_logger(self.__logger)
-            sys.exit(-1)
+            sys.exit(error_message)
         # endif
         return path_to_lc_config
     # end set_ProSAIL_config
@@ -166,7 +196,7 @@ class inversion:
         if not os.path.isfile(path_to_soilrefl_file):
             self.__logger.error("Unable to locate the soil_reflectance.txt file!")
             close_logger(self.__logger)
-            sys.exit(-1)
+            sys.exit(error_message)
         soils = np.genfromtxt(path_to_soilrefl_file)
         return soils
     # end set_soilrefl_file
@@ -174,16 +204,22 @@ class inversion:
 
     def get_scene_metadata(self):
         """
-        reads the Sen2Core metadata file in case Sentinel-2 is used and sets
-        the inversion class variables accordingly
+        reads the Sen2Core metadata file in case Sentinel-2 is used file-based
+        and sets the inversion class variables accordingly
+        call parse_s2xml in case Sen2Core was used for the atcorr
+        call parse_gee_metadata in case Google Earth Engine was used for atcorr
         """
-        self.__metadata = parse_s2xml(self.xml_file)
+        # make distinction between Sen2Core preprocessing and GEE preprocessing
+        if self.__use_gee:
+            self.__metadata = parse_gee_metadata(self.__gee_metadata)
+        else:
+            self.__metadata = parse_s2xml(self.xml_file)
         try:
             assert self.__metadata is not None
         except AssertionError:
             self.__logger.error('Scene metadata could not be read!')
             close_logger(self.__logger)
-            sys.exit(-1)
+            sys.exit(error_message)
 
 
 class lut_inversion(inversion):
@@ -205,8 +241,11 @@ class lut_inversion(inversion):
         -------
         None
         """
+        # read in and parse the metadata
+        self.get_scene_metadata()
         # get sensor and scene_id
-        self.__sensor, self.__scene_id = get_sensor_and_sceneid(self.__metadata)
+        self.__sensor, self.__scene_id = get_sensor_and_sceneid(
+                self.__metadata)
         # get mean angles from scene-metadata
         # tto -> sensor zenith angle
         # psi -> relative azimuth angle between sensor and sun
@@ -215,13 +254,19 @@ class lut_inversion(inversion):
         # sun zenith angle
         self.__tts = get_sun_zenith_angle(self.__metadata)
         # get the footprint already as PostGIS insert statment
-        footprint_statement = get_scene_footprint(self.__metadata)
+        footprint_statement = get_scene_footprint(self.__metadata,
+                                                  self.__use_gee)
         # full metadata as JSON
         metadata_json = json.dumps(self.__metadata)
         # storage drive and filename of the image raster data
-        splitted = os.path.split(self.raster)
-        storage_drive = splitted[0]
-        filename = splitted[1]
+        # this part only applies to Sen2Core preprocessing
+        if self.__use_gee:
+            storage_drive = 'NA: Google Earth Engine'
+            filename = 'NA: Google Earth Engine'
+        else:
+            splitted = os.path.split(self.raster)
+            storage_drive = splitted[0]
+            filename = splitted[1]
         # get acquisition time and date
         self.acquisition_time, self.acquisition_date = get_acqusition_time(
                 self.__metadata)
@@ -249,17 +294,21 @@ class lut_inversion(inversion):
         except psycopg2.DatabaseError:
             self.__logger.error('Insert of metadata failed!', exc_info=True)
             close_logger(self.__logger)
-            sys.exit(-1)
+            sys.exit(error_message)
 
 
-    def gen_lut(self, inv_table):
+    def gen_lut(self, inv_mapping_table, inv_table):
         """
         Generates the lookup table and stores it in the DB
 
         Parameters
         ----------
+        inv_mapping_table : String
+            name of the table storing the inversion mapping required for
+            performing the inversion
         inv_table : String
-            Name of the table the lookup-table should be written to (without schema)
+            Name of the table the lookup-table should be written to
+            (<schema.table>)
 
         Returns:
         --------
@@ -309,10 +358,11 @@ class lut_inversion(inversion):
             # convert to json
             params_inv_json = json.dumps(params_inv)
             # write the metadata into the inversion_mapping table
-            insert = "INSERT INTO inversion_mapping (acquisition_date, " \
+            insert = "INSERT INTO {0} (acquisition_date, " \
                      "params_to_be_inverted, landuse, sensor, scene_id) " \
-                     "VALUES('{0}', '{1}', {2}, '{3}', '{4}');".format(
-                             self.acquisition_dae,
+                     "VALUES('{1}', '{2}', {3}, '{4}', '{5}');".format(
+                             inv_mapping_table,
+                             self.acquisition_date,
                              params_inv_json,
                              lc_code,
                              self.__sensor,
@@ -324,7 +374,7 @@ class lut_inversion(inversion):
                 self.__logger.error("Failed to insert metadata of inversion process!",
                                     exc_info=True)
                 close_logger(self.__logger)
-                sys.exit(-1)
+                sys.exit(error_message)
 
             # loop over the parameters stored in the LUT and generate the 
             # according synthetic spectra
@@ -423,7 +473,7 @@ class lut_inversion(inversion):
 
 
     def do_obj_inversion(self, object_id, acqui_date, land_use, num_solutions,
-                         inv_params, res_table):
+                         inv_params, res_table, object_table, lut_table):
         """
         performs inversion per single object using mean of xx best
         solutions (RMSE criterion) and stores result results table
@@ -447,6 +497,12 @@ class lut_inversion(inversion):
             list of the parameters (must be named) to be inverted
         res_table : String
             tablename where to store the results of the inversion
+            (<schema.table>)
+        object_table : String
+            tablename of the table containing the object spectra
+            (<schema.table>)
+        lut_table : String
+            tablename of the lookup-table (<schema.table>)
 
         Returns
         -------
@@ -460,20 +516,22 @@ class lut_inversion(inversion):
                              lut.b5, lut.b6, lut.b7, lut.b8a, lut.b11, lut.b12) 
                         AS rmse
                     FROM
-                        s2_obj_spec as obj,
-                        s2_lut as lut
+                        {0} as obj,
+                        {1} as lut
                     WHERE
-                        obj.object_id = {0}
+                        obj.object_id = {2}
                     AND
-                       obj.acquisition_date = '{1}'
+                       obj.acquisition_date = '{3}'
                     AND
-                       obj.landuse = {2}
+                       obj.landuse = {4}
                     AND
                         obj.landuse = lut.landuse
                     AND
                         obj.acquisition_date = lut.acquisition_date
                     ORDER BY rmse ASC
-                    LIMIT {3};""".format(
+                    LIMIT {5};""".format(
+                    object_table,
+                    lut_table,
                     object_id,
                     acqui_date,
                     land_use,
@@ -498,8 +556,8 @@ class lut_inversion(inversion):
             sql_snippets = sql_snippets[1:len(sql_snippets)-1]
             sql_snippets = sql_snippets.replace("'", "")
             
-            # select the biophysical parameters from the xx best solutions in the
-            # lut table using the lut ids as keys
+            # select the biophysical parameters from the xx best solutions in
+            # the lut table using the lut ids as keys
             query = "SELECT {0} FROM s2_lut WHERE id in {1};".format(
                     sql_snippets,
                     lut_ids)
@@ -522,7 +580,8 @@ class lut_inversion(inversion):
                 error_json = json.dumps(error_dict)
 
                 # insert statement
-                insert = "INSERT INTO {0} VALUES ({1}, '{2}', '{3}', '{4}');".format(
+                insert = "INSERT INTO {0} VALUES ({1}, '{2}', '{3}', "\
+                "'{4}');".format(
                         res_table,
                         object_id,
                         acqui_date,
@@ -533,19 +592,25 @@ class lut_inversion(inversion):
                     self.cursor.execute(insert)
                     self.conn.commit()
                 except Exception:
-                    self.__logger.error("Insert of results for object {0} failed!".format(
+                    self.__logger.error("Insert of results for object "\
+                                        "{0} failed!".format(
                             object_id), exc_info=True)
                     close_logger(self.__logger)
+                    print(error_message)
                     return -1
             except Exception:
-                self.__logger.error("No inversion result could be obtained for object {0}".format(
+                self.__logger.error("No inversion result could be obtained "\
+                                    "for object {0}".format(
                         object_id), exc_info=True)
                 close_logger(self.__logger)
+                print(error_message)
                 return -1
         except Exception as err:
-            self.__logger.error("Inverting object with id {0} failed".format(object_id),
+            self.__logger.error("Inverting object with id {0} failed".format(
+                    object_id),
                                 exc_info=True)
             close_logger(self.__logger)
+            print(error_message)
             return -1
         # return zero if everything was OK
         status = 0
@@ -553,7 +618,8 @@ class lut_inversion(inversion):
     # end function
 
 
-    def do_inversion(self, acqui_date, land_use, num_solutions, res_table, return_specs=True):
+    def do_inversion(self, acqui_date, land_use, num_solutions, res_table,
+                     object_table, inv_mapping_table, return_specs=True):
         """
         performs inversion on all objects for a given date.
         NOTE: the object reflectance values must be already available in the data
@@ -570,6 +636,9 @@ class lut_inversion(inversion):
             how many solutions should be used for generating the inversion result
         res_table : String
             tablename where to store the results of the inversion
+            (<schema.table>)
+        object_table : String
+            tablename of table containing the object spectra (<schema.table>)
         return_specs : Boolean
             determines whether inverted spectra should be returned (True; default)
 
@@ -578,9 +647,10 @@ class lut_inversion(inversion):
         None
         """
         # get list of objects available for a given land use class at a given day
-        query = "SELECT DISTINCT object_id FROM s2_obj_spec " \
-                " WHERE acquisition_date = '{0}'" \
-                " AND landuse = {1};".format(
+        query = "SELECT DISTINCT object_id FROM {0} " \
+                " WHERE acquisition_date = '{1}'" \
+                " AND landuse = {2};".format(
+                        object_table,
                         acqui_date,
                         land_use)
         try:
@@ -589,7 +659,8 @@ class lut_inversion(inversion):
             object_ids = [item[0] for item in object_ids]
             
         except Exception:
-            self.__logger.error("Could not query objects for acquistion date {0} and LUC {1}".format(
+            self.__logger.error("Could not query objects for acquistion date "\
+                                "'{0}' and LUC {1}".format(
                     acqui_date,
                     land_use),
                     exc_info=True)
@@ -597,8 +668,8 @@ class lut_inversion(inversion):
             sys.exit(-1)
         
         # get the list of params to be inverted
-        query = "SELECT params_to_be_inverted FROM inversion_mapping" \
-                " WHERE acquisition_date = '{0}' AND landuse = {1};".format(
+        query = "SELECT params_to_be_inverted FROM {0}" \
+                " WHERE acquisition_date = '{1}' AND landuse = {2};".format(
                         acqui_date,
                         land_use
                         )
@@ -619,18 +690,20 @@ class lut_inversion(inversion):
                 # endfor
             # endif
         except Exception :
-            self.__logger.error("Retrieving inversion metadata for acquisition date {0} and LUC {1} failed!".format(
+            self.__logger.error("Retrieving inversion metadata for acquisition "\
+                                "date '{0}' and LUC {1} failed!".format(
                     acqui_date,
                     land_use),
                     exc_info=True)
             close_logger(self.__logger)
-            sys.exit(-1)
+            sys.exit(error_message)
 
         # iterate over all objects to perform the inversion per object
         for ii in range(len(object_ids)):
             object_id = object_ids[ii]
             resrun = self.do_obj_inversion(object_id, acqui_date, land_use, 
-                                           num_solutions, params_list, res_table)
+                                           num_solutions, params_list,
+                                           res_table)
             # in case an error happened continue with next object
             if resrun != 0:
                 continue

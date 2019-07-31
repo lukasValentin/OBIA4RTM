@@ -140,7 +140,7 @@ def get_acqusition_time(sensor_data):
     return acquisition_time, acqusition_date
 
 
-def get_scene_footprint(sensor_data):
+def get_scene_footprint(sensor_data, gee=False):
     """
     get the footprint (geometry) of a scene by calculating its geogr. extent
 
@@ -148,27 +148,50 @@ def get_scene_footprint(sensor_data):
     ----------
     sensor data : Dictionary
         extracted S2 metadata
+    gee : Boolean
+        determines if metadata is derived from Google Earth-Engine
+        Default: False
 
     Returns
     -------
     postgis_expression : String
         footprint with information for well-known-text based insert into PostGIS
     """
-    pixelsize = 10  # meters
-    # use per default the 10m-representation
+    # get the EPSG-code
     epsg = sensor_data['EPSG']
     epsg = epsg.split(':')[1]
-    ulx = np.float32(sensor_data['ULX_10m'])  # upper left x
-    uly = np.float32(sensor_data['ULY_10m'])  # upper left y
-    nrows = int(sensor_data['NROWS_10m'])     # number of rows
-    ncols = int(sensor_data['NCOLS_10m'])     # number of columns
-    # calculate the other image corners (upper right, lower left, lower right)
-    urx = ulx + (ncols - 1) * pixelsize       # upper right x
-    ury = uly                                 # upper right y
-    llx = ulx                                 # lower left x
-    lly = uly - (nrows + 1) * pixelsize       # lower left y
-    lrx = urx                                 # lower right x
-    lry = lly                                 # lower right y
+    # in case the metadata comes from Sen2Core
+    if not gee:
+        pixelsize = 10  # meters
+        # use per default the 10m-representation
+        ulx = np.float32(sensor_data['ULX_10m'])  # upper left x
+        uly = np.float32(sensor_data['ULY_10m'])  # upper left y
+        nrows = int(sensor_data['NROWS_10m'])     # number of rows
+        ncols = int(sensor_data['NCOLS_10m'])     # number of columns
+        # calculate the other image corners (upper right, lower left, lower right)
+        urx = ulx + (ncols - 1) * pixelsize       # upper right x
+        ury = uly                                 # upper right y
+        llx = ulx                                 # lower left x
+        lly = uly - (nrows + 1) * pixelsize       # lower left y
+        lrx = urx                                 # lower right x
+        lry = lly                                 # lower right y
+    # in case the metadata comes from GEE
+    else:
+        # extract the corner coordinates
+        # upper left corner
+        ulx = sensor_data['ULX_10m']
+        uly = sensor_data['ULY_10m']
+        # upper right corner
+        lrx = sensor_data['LRX_10m']
+        lry = sensor_data['LRY_10m']
+        # the remaining two corners can be determined from this information
+        urx = ulx                                 # upper right x
+        ury = uly                                 # upper right y
+        llx = ulx                                 # lower left x
+        lly = lry                                 # lower left y
+        lrx = urx                                 # lower right x
+        lry = lly                                 # lower right y
+
     # use the pairs to construct an insert statement for PostGIS
     ul = str(ulx) + " " + str(uly)
     ur = str(urx) + " " + str(ury)

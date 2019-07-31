@@ -434,6 +434,11 @@ class s2_Py6S_atcorr:
         h2o = Atmospheric.water(geom, date).getInfo()
         o3 = Atmospheric.ozone(geom, date).getInfo()
         aot = Atmospheric.aerosol(geom, date).getInfo()
+        # add this information to the info dictionary as this metadata could
+        # be of interest afterwards
+        self.info['WATER_VAPOUR'] = h2o
+        self.info['OZONE'] = o3
+        self.info['AOT'] = aot
         # get the average altitude of the region to be processed
         # for the Digital Elevation Model (DEM) the Shuttle Radar Topography
         # Mission (SRTM) is used (Version 4) as it covers most parts of the

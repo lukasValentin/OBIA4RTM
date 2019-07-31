@@ -46,6 +46,8 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
         file-path to ESRI shapefile with the image object boundaries
     raster_file : String
         file-path to raster containing Sentinel-2 imagery as GeoTiff
+        it is assumed that clouds/ shadows etc have already been masked out
+        and these pixels are set to the according NoData value
     acqui_date : String
         acquisition date of the imagery (used for linking to LUT and metadata)
     conn : psycopg2 Database connection
@@ -228,7 +230,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
             dataraster = banddataraster.ReadAsArray(xoff, yoff, xcount, ycount).astype(np.float)
 
             # Mask zone of raster
-            zoneraster = np.ma.masked_array(dataraster,  np.logical_not(datamask))
+            zoneraster = np.ma.masked_array(dataraster, np.logical_not(datamask))
             # apply conversion factor of 0.01 to get the correct reflectance
             # values for ProSAIL
             mean = np.nanmean(zoneraster) * 0.01
@@ -236,6 +238,11 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
             # increment index
             index += 1
         #endfor
+        # check if the results are not nan -> if there are nans skip the object
+        # as the ProSAIL model inversion cannot deal with missing values
+        if any(np.isnan(meanValues)):
+            logger.warning('The object with ID {} contains NaNs -> skipping!')
+            continue
 
         #insert the mean reflectane and the object geometry into DB
         query = "INSERT INTO {0} (object_id, acquisition_date, landuse, object_geom, " \
