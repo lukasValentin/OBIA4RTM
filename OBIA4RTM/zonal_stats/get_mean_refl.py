@@ -111,7 +111,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
         sys.exit('An error occured while execute get_mean_refl. Check logfile!')
     
     # check the image raster
-    num_bands = 9 # Sentinel-2 bands: B2, B3, B4, B5, B6, B7, B8A, B11, B12
+    num_bands = 10 # Sentinel-2 bands: B2, B3, B4, B5, B6, B7, B8A, B11, B12 + SLC
     if (raster.RasterCount != num_bands):
         logger.error("The number of bands you provided does not match the image file!")
         close_logger(logger)
@@ -223,8 +223,10 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
         meanValues = []
         # iterator variable for looping over Sentinel-2 bands
         index = 1
+        # in case the object is cloud covered or of affected by cirrus
+        skip_flag = False
+        # iterate over the bands
         for ii in range(raster.RasterCount):
-        
             banddataraster = raster.GetRasterBand(index)
             # read image data at the specific extent covering the actual feature
             dataraster = banddataraster.ReadAsArray(xoff, yoff, xcount, ycount).astype(np.float)
@@ -233,11 +235,24 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
             zoneraster = np.ma.masked_array(dataraster, np.logical_not(datamask))
             # apply conversion factor of 0.01 to get the correct reflectance
             # values for ProSAIL
-            mean = np.nanmean(zoneraster) * 0.01
-            meanValues.append(mean)
+            if ii < raster.RasterCount - 1:
+                mean = np.nanmean(zoneraster) * 0.01
+                meanValues.append(mean)
+            # treat the SCL band with the pre-class info differently
+            else:
+                counts = np.bincount(zoneraster)
+                # get the most frequent value
+                argmax = np.argmax(counts)
+                # in case the value is greater than 4 (vegetation) skip the object
+                if argmax > 4.:
+                    skip_flag = True
             # increment index
             index += 1
         #endfor
+        # in case the skip flag was set -> skip
+        if skip_flag:
+            logger.info('The object is not vegetated -> skipping!')
+            continue
         # check if the results are not nan -> if there are nans skip the object
         # as the ProSAIL model inversion cannot deal with missing values
         if any(np.isnan(meanValues)):
