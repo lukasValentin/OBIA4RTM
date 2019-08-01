@@ -35,7 +35,8 @@ import numpy as np
 import ee
 from osgeo import ogr, osr
 from psycopg2 import DatabaseError, ProgrammingError
-from OBIA4RTM.configurations.logger import close_logger
+from OBIA4RTM.configurations.connect_db import connect_db, close_db_connection
+from OBIA4RTM.configurations.logger import get_logger, close_logger
 
 
 def transform_utm_to_wgs84(easting, northing, zone):
@@ -77,8 +78,7 @@ def transform_utm_to_wgs84(easting, northing, zone):
     return utm_to_wgs84_transform.TransformPoint(easting, northing, 0)
 
 
-def get_mean_refl(shp_file, img, acqui_date, conn, cursor,
-                  table_name, logger):
+def get_mean_refl_ee(shp_file, img, acqui_date, table_name):
     """
     calculates mean reflectance per object in image. Uses GEE-Python bindings
     for reading the shape and Sentinel-2 imagery data.
@@ -91,19 +91,17 @@ def get_mean_refl(shp_file, img, acqui_date, conn, cursor,
         GEE imagery containing the atmospherically collected Sentinel-2 data
     acqui_date : String
         acquisition date of the imagery (used for linking to LUT and metadata)
-    conn : psycopg2 Database connection
-        connection to OBIA4RTM database
-    cursor : psycopg2 database cursor
-        for querying, updating and inserting into the OBIA4RTM database
     table_name : String
         Name of the table the object reflectance values should be written to
-    logger : logging Logger object
-        for tracking the progress and errors
 
     Returns
     -------
     None
     """
+    # open the database connection to OBIA4RTM's backend
+    conn, cursor = connect_db()
+    # get a logger
+    logger = get_logger()
     # in case it isn't done yet:
     ee.Initialize()
     
@@ -170,7 +168,7 @@ def get_mean_refl(shp_file, img, acqui_date, conn, cursor,
             luc = int(luc)
         except ValueError:
             luc = luc.upper()
-            query = "SELECT landuse FROM s2_landuse WHERE landuse_semantic = "\
+            query = "SELECT landuse FROM public.s2_landuse WHERE landuse_semantic = "\
             "'{0}';".format(
                     luc)
             cursor.execute(query)
@@ -300,3 +298,5 @@ def get_mean_refl(shp_file, img, acqui_date, conn, cursor,
     # close the GDAL-bindings to the files
     shpfile = None
     layer = None
+    # close database connection
+    close_db_connection(conn, cursor)

@@ -31,11 +31,11 @@ import sys
 import numpy as np
 from osgeo import ogr, osr, gdal
 from psycopg2 import DatabaseError, ProgrammingError
-from OBIA4RTM.configurations.logger import close_logger
+from OBIA4RTM.configurations.connect_db import connect_db, close_db_connection
+from OBIA4RTM.configurations.logger import get_logger, close_logger
 
 
-def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
-                  table_name, logger):
+def get_mean_refl(shp_file, raster_file, acqui_date, table_name):
     """
     calculates mean reflectance per object in image. Uses GDAL-Python bindings
     for reading the shape and raster data.
@@ -50,19 +50,18 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
         and these pixels are set to the according NoData value
     acqui_date : String
         acquisition date of the imagery (used for linking to LUT and metadata)
-    conn : psycopg2 Database connection
-        connection to OBIA4RTM database
-    cursor : psycopg2 database cursor
-        for querying, updating and inserting into the OBIA4RTM database
     table_name : String
         Name of the table the object reflectance values should be written to
-    logger : logging Logger object
-        for tracking the progress and errors
 
     Returns
     -------
     None
     """
+    # open the database connection to OBIA4RTM's backend
+    conn, cursor = connect_db()
+    # get a logger
+    logger = get_logger()
+
     # iterate over the shapefile to get the metadata
     # Shapefile handling
     driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -70,7 +69,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
     layer = shpfile.GetLayer(0)
     num_objects = layer.GetFeatureCount()
 
-    logger.info("{0} image objects will be processed. This might take a while...".format(
+    logger.info("{0} image objects will be processed".format(
             num_objects))
 
     # loop over single features
@@ -259,7 +258,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
             logger.warning('The object with ID {} contains NaNs -> skipping!')
             continue
 
-        #insert the mean reflectane and the object geometry into DB
+        # insert the mean reflectane and the object geometry into DB
         query = "INSERT INTO {0} (object_id, acquisition_date, landuse, object_geom, " \
                 "b2, b3, b4, b5, b6, b7, b8a, b11, b12) VALUES ( " \
                 "{1}, '{2}', {3}, ST_Multi(ST_GeometryFromText('{4}', {5})), " \
@@ -290,11 +289,11 @@ def get_mean_refl(shp_file, raster_file, acqui_date, conn, cursor,
                     f_id, table_name), exc_info=True)
             conn.rollback()
             continue
-    #endfor
+    # endfor
 
     # close the GDAL-bindings to the files
     raster = None
     shpfile = None
     layer = None
-    
-# end
+    # close database connection
+    close_db_connection(conn, cursor)

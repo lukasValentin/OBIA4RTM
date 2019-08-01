@@ -30,8 +30,9 @@ The overall workflow implemented in OBIA4RTM is shown below.
 ## Inputs
 
 OBIA4RTM currently expects **Sentinel-2** imagery in **Level-2A** (i.e. corrected for atmospheric effects). Per default it is assumed that Sen2Core was used for generating the Level-2A data (see: http://step.esa.int/main/third-party-plugins-2/sen2cor/) or data was almost downloaded in this processing level from Copernicus or any other (national) data hub.
+**OBIA4RTM offers a convenient wrapper around the Sen2Core command line tool** that takes about all the preprocessing and formatting steps. This wrapper works independently of OBIA4RTM in the sense that it does not interact with the OBIA4RTM database. In can be therefore also used for other Sentinel-2 preprocessing workflows.
 
-Optionally, preprocessing can be done using **Google Earth Engine** that is available as an **`addon`**.
+Optionally, preprocessing can be also done using **Google Earth Engine** (optionally) which makes OBIA4RTM a **zero-download** program as not imagery is downloaded expect the object spectra that are directly written to the OBIA4RTM database.
 
 ![OBIA4RTM Workflow](https://github.com/lukasValentin/OBIA4RTM/blob/master/OBIA4RTM_Workflow.gif "OBIA4RTM Workflow Overview")
 
@@ -52,7 +53,7 @@ Band Number  |	Central wavelength (nm)	|  Bandwidth (nm)  |  Spatial resolution 
 11   |	1613.7 |	91	| 20
 12   |	2202.4 |	175	| 20
 
-- In the future, an xml-file containing the metadata of the Sen2Core Level-2A can be supplied that will be used for retrieving illumination and geometry metadata required for creating the ProSAIL LUT. As long as this feature is not ready (or no Sen2Core like xml metadata is available), this information needs to be inserted manually.
+- Scene metadata is read directly from either the Sen2Core provided metadata file (or in case you have already acquired Level-2A data the equivalent xml file) or by using the Google-Earth-Engine derived scene metadata. Without this metadata information, OBIA4RTM cannot be executed!
 
 - the use of Copernicus land monitoring data is just a *suggestion*. Users can use also different land cover/ use classification or can even provide no classification at all (then all objects will be treated equally, otherwise, vegetation parameters have to be set per land use class).
 
@@ -70,12 +71,13 @@ tbd
 Usage Instructions
 ------------------
 
-tbd
+### Image Preprocessing
 
-Addons
-------
+To enable *operational usage* of OBIA4RTM, **preprocessing opportunities** are offered using **`Google Earth Engine (Python API client)`** (GEE) or **`Sen2Core`** software together with **`GDAL`**.
 
-To enable *operational usage* of OBIA4RTM, **preprocessing opportunities** are offered using **`Google Earth Engine (Python API client)`**. This includes atmospheric correction using **Py6S** as well as cloud and cloud shadow masking using functionalities provided by Sam Murphy under Apache 2.0 license.
+The **Sen2Core** approach is optional in the way that OBIA4RTM also accepts imagery in Level-2A directly provided from ESA (i.e images one which Sen2Core was almost executed by ESA). Using GDAL, the imagery is then also brought in the format required by OBIA4RTM (GeoTiff as image stack of the required Sentinel-2 bands and the SCL layer). Thus, the user has not to take care about any annoying preprocessing or file conversion issues.
+
+The **GEE** approach includes atmospheric correction using **Py6S** as well as cloud and cloud shadow masking using functionalities provided by Sam Murphy under Apache 2.0 license.
 Check out
 
 - https://github.com/samsammurphy/gee-atmcorr-S2 for the atmospheric correction algorithm, and
@@ -87,6 +89,10 @@ The preprocessed images are then stored and treated the same way in OBIA4RTM as 
 For demonstration, some sample code is available in a Jupyter Notebook https://github.com/lukasValentin/OBIA4RTM/tree/master/Examples/jupyter
 
 **NOTE**: Please make sure to follow the installation instructions before running this functionality and having the Google Earth Engine client enabled.
+
+### Inversion
+
+tbd
 
 
 Demodata produced with OBIA4RTM

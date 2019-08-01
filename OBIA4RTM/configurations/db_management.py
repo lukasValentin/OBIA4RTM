@@ -89,7 +89,8 @@ def update_luc_table(landcover_table, landcover_cfg=None):
         sys.exit('Error while reading the landcover.cfg file. Check log.')
     # now, iterate through the lines of the cfg files and insert it into
     # the Postgres database
-    logger.info("Try to insert values into table '{0}' from landcover.cfg file ({1})".format(
+    logger.info("Try to insert values into table '{0}' from landcover.cfg "\
+                "file ({1})".format(
             landcover_table,
             landcover_cfg))
 
