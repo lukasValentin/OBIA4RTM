@@ -7,7 +7,7 @@ CREATE TABLE schema_name.table_name
 (
   	object_id 		BIGINT NOT NULL,
   	acquisition_date 	DATE NOT NULL,
-	scene_id		JSON,
+	scene_id		CHARACTER VARYING NOT NULL,
   	landuse 		INTEGER DEFAULT 999,	
 	object_geom 		GEOMETRY(MultiPolygon) NOT NULL,	
   	b2 			DOUBLE PRECISION,
@@ -19,7 +19,7 @@ CREATE TABLE schema_name.table_name
   	b8a 			DOUBLE PRECISION,
   	b11 			DOUBLE PRECISION,
   	b12 			DOUBLE PRECISION,
-  	CONSTRAINT s2_objspec_pkey PRIMARY KEY (object_id, acquisition_date)
+  	CONSTRAINT s2_objspec_pkey PRIMARY KEY (object_id, scene_id)
 )
 WITH (
   OIDS=FALSE

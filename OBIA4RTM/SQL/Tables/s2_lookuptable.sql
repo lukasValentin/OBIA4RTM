@@ -7,6 +7,7 @@ CREATE TABLE schema_name.table_name
 (
 	id 			BIGINT NOT NULL, 
   	acquisition_date 	DATE NOT NULL,
+	scene_id		CHARACTER VARYING NOT NULL,
   	landuse 		INTEGER DEFAULT 999,
   -- ProSAIL parameters
    --n := mesophyll structure parameter N (-)
@@ -52,7 +53,7 @@ CREATE TABLE schema_name.table_name
   	b11 			DOUBLE PRECISION,
   	b12 			DOUBLE PRECISION,
   -- set primary key
-  	PRIMARY KEY (id, acquisition_date)
+  	PRIMARY KEY (id, scene_id)
 )
 WITH (
   OIDS=FALSE

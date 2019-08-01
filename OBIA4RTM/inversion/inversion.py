@@ -212,6 +212,7 @@ class lut_inversion(inversion):
                 soil_path=None):
         """
         Generates the lookup table and stores it in the DB
+        must be run seperately from the inversion part
 
         Parameters
         ----------
@@ -356,12 +357,16 @@ class lut_inversion(inversion):
                 sensor_spectrum *= 100.
 
                 # store the results in DB
-                insert_statement = "INSERT INTO {0} (id, n, cab, car, cbrown, cw, cm, " \
-                                    "lai, lidfa, lidfb, rsoil, psoil, hspot, tts, tto, psi, typelidf, " \
-                                    "b2, b3, b4, b5, b6, b7, b8a, b11, b12, acquisition_date, landuse) VALUES " \
-                                    "({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, " \
-                                    "{12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, {20}, {21}, " \
-                                    "{22}, {23}, {24}, {25}, {26}, '{27}', {28});".format(
+                insert_statement = "INSERT INTO {0} (id, n, cab, car, cbrown, "\
+                                    "cw, cm, lai, lidfa, lidfb, rsoil, psoil, "\
+                                    "hspot, tts, tto, psi, typelidf, "\
+                                    "b2, b3, b4, b5, b6, b7, b8a, b11, b12, "\
+                                    "acquisition_date, landuse, scene_id) "\
+                                    "VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, "\
+                                    "{8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, " \
+                                    "{18}, {19}, {20}, {21}, {22}, {23}, {24}, {25}, {26}, '{27}', " \
+                                    "{28}, '{29}') ON CONFLICT (id, scene_id) "\
+                                    "DO NOTHING;".format(
                                             inv_table,
                                             ii,
                                             np.round(n, 2),
@@ -390,7 +395,8 @@ class lut_inversion(inversion):
                                             np.round(sensor_spectrum[7], 4),
                                             np.round(sensor_spectrum[8], 4),
                                             self.acquisition_date,
-                                            lc_code
+                                            lc_code,
+                                            self.scene_id
                                             )
                 try:
                     self.cursor.execute(insert_statement)
@@ -450,19 +456,19 @@ class lut_inversion(inversion):
                     WHERE
                         obj.object_id = {2}
                     AND
-                       obj.acquisition_date = '{3}'
+                       obj.scene_id = '{3}'
                     AND
                        obj.landuse = {4}
                     AND
                         obj.landuse = lut.landuse
                     AND
-                        obj.acquisition_date = lut.acquisition_date
+                        obj.scene_id = lut.scene_id
                     ORDER BY rmse ASC
                     LIMIT {5};""".format(
                     object_table,
                     lut_table,
                     object_id,
-                    acqui_date,
+                    self.scene_id,
                     land_use,
                     num_solutions)
         try:
@@ -509,13 +515,16 @@ class lut_inversion(inversion):
                 error_json = json.dumps(error_dict)
 
                 # insert statement
-                insert = "INSERT INTO {0} VALUES ({1}, '{2}', '{3}', "\
-                "'{4}');".format(
+                insert = "INSERT INTO {0} (object_id, acquisition_date, "\
+                "inversion_results, inversion_errors, scene_id) VALUES ({1}, "\
+                "'{2}', '{3}', '{4}', '{5}') ON CONFLICT (object_id, "\
+                "scene_id) DO NOTHING;".format(
                         res_table,
                         object_id,
                         acqui_date,
                         result_json,
-                        error_json
+                        error_json,
+                        self.scene_id
                         )
                 try:
                     self.cursor.execute(insert)
@@ -598,8 +607,8 @@ class lut_inversion(inversion):
         
         # get the list of params to be inverted
         query = "SELECT params_to_be_inverted FROM {0}" \
-                " WHERE acquisition_date = '{1}' AND landuse = {2};".format(
-                        self.acqui_date,
+                " WHERE scene_id = '{1}' AND landuse = {2};".format(
+                        self.scene_id,
                         land_use
                         )
         try:
@@ -620,8 +629,8 @@ class lut_inversion(inversion):
             # endif
         except Exception :
             self.__logger.error("Retrieving inversion metadata for acquisition "\
-                                "date '{0}' and LUC {1} failed!".format(
-                    self.acqui_date,
+                                "scene '{0}' and LUC {1} failed!".format(
+                    self.scene_id,
                     land_use),
                     exc_info=True)
             close_logger(self.__logger)

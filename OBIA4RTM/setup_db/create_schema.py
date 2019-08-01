@@ -101,23 +101,25 @@ def create_schema():
     con.commit()
     # enable PostGIS and HSTORE extension
     # enable the PostGIS extension
+    # in case it fails it is most likely because the extension was almost
+    # enabled as it should
     sql = "CREATE EXTENSION PostGIS;"
     try:
         cursor.execute(sql)
         con.commit()
     except (ProgrammingError, DatabaseError):
-        logger.error("PostGIS setup failed!", exc_info=True)
-        close_logger(logger)
-        sys.exit()
+        logger.info("PostGIS already enabled!", exc_info=True)
+        con.rollback()
+        pass
     # enable the HSTORE extension
     sql = "CREATE EXTENSION HSTORE;"
     try:
         cursor.execute(sql)
         con.commit()
     except (ProgrammingError, DatabaseError):
-        logger.error("HSTORE setup failed!", exc_info=True)
-        close_logger(logger)
-        sys.exit(sys_exit_message)
+        logger.error("HSTORE already enabled!", exc_info=True)
+        con.rollback()
+        pass
 
     logger.info("Successfully created schema '{}' in current OBIA4RTM database!".format(
             schema))

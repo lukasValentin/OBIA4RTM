@@ -35,7 +35,7 @@ from OBIA4RTM.configurations.connect_db import connect_db, close_db_connection
 from OBIA4RTM.configurations.logger import get_logger, close_logger
 
 
-def get_mean_refl(shp_file, raster_file, acqui_date, table_name):
+def get_mean_refl(shp_file, raster_file, acqui_date, scene_id, table_name):
     """
     calculates mean reflectance per object in image. Uses GDAL-Python bindings
     for reading the shape and raster data.
@@ -50,6 +50,8 @@ def get_mean_refl(shp_file, raster_file, acqui_date, table_name):
         and these pixels are set to the according NoData value
     acqui_date : String
         acquisition date of the imagery (used for linking to LUT and metadata)
+    scene_id : String
+        ID of the Sentinel-2 scene
     table_name : String
         Name of the table the object reflectance values should be written to
 
@@ -259,10 +261,11 @@ def get_mean_refl(shp_file, raster_file, acqui_date, table_name):
             continue
 
         # insert the mean reflectane and the object geometry into DB
-        query = "INSERT INTO {0} (object_id, acquisition_date, landuse, object_geom, " \
-                "b2, b3, b4, b5, b6, b7, b8a, b11, b12) VALUES ( " \
+        query = "INSERT INTO {0} (object_id, acquisition_date, landuse object_geom, "\
+                "b2, b3, b4, b5, b6, b7, b8a, b11, b12, scene_id) VALUES ( " \
                 "{1}, '{2}', {3}, ST_Multi(ST_GeometryFromText('{4}', {5})), " \
-                "{6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14});".format(
+                "{6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, '{15}'}) "\
+                " ON CONFLICT (object_id, scene_id) DO NOTHING;".format(
                         table_name,
                         f_id,
                         acqui_date,
@@ -278,6 +281,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, table_name):
                         np.round(meanValues[6], 4),
                         np.round(meanValues[7], 4),
                         np.round(meanValues[8], 4),
+                        scene_id
                         )
         # catch errors for single objects accordingly and continue with next
         # object to avoid interrupts of whole workflow

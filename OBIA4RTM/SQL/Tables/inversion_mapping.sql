@@ -10,6 +10,7 @@ CREATE TABLE schema_name.table_name(
 	params_to_be_inverted 	HSTORE,
 	lookup_table		CHARACTER VARYING(255) NOT NULL,	
 	landuse 		INTEGER NOT NULL,
-	sensor 			CHARACTER VARYING(20) DEFAULT 'SENTINEL-2',
-	scene_id 		CHARACTER VARYING(255) NOT NULL
+	sensor 			CHARACTER VARYING(20) DEFAULT 'S2A',
+	scene_id 		CHARACTER VARYING(255) NOT NULL,
+	CONSTRAINT inv_map_pkey PRIMARY KEY (scene_id)
 );

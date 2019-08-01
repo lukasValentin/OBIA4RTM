@@ -257,9 +257,6 @@ class API:
         if self.__tablenames is None:
             self.set_tablenames()
         tablename_obj_spec = self.__tablenames[2]
-        # now the zonal stats function can be called
-        # after that the preprocessing using GEE is finished
-        get_mean_refl_ee(shp_file, S2_SRF, acqui_date, tablename_obj_spec)
         # return the metadata as this information will be lost otherwise
         # (but is required for the inversion)
         # some formatting is necessary, however
@@ -267,11 +264,18 @@ class API:
         metadata = parse_gee_metadata(gee_metadata)
         # insert the metadata into the OBIA4RTM backend
         insert_scene_metadata(metadata, use_gee=True)
+        # get the scene_id and the actual acqui date as this could differ
+        # from the one specified in case on that day no scene was found
+        scene_id = metadata['SCENE_ID']
+        acqui_date = metadata['SENSING_TIME'][0:10] 
+        # now the zonal stats function can be called
+        # after that the preprocessing using GEE is finished
+        get_mean_refl_ee(shp_file, S2_SRF, acqui_date, scene_id,
+                         tablename_obj_spec)
         # get the SCENE_ID and return it
-        return metadata['SCENE_ID']
+        return scene_id
 
-
-    def do_sen2core_preprocessing(self, acqui_date, sentinel_data_dir,
+    def do_sen2core_preprocessing(self, sentinel_data_dir,
                                    zipped, resolution, path_sen2core,
                                    shp_file, storage_dir=None):
         """
@@ -283,8 +287,6 @@ class API:
 
         Parameters
         ----------
-        acqui_date : String
-            acquisition date to be processed (format: YYYY-MM-DD)
         sentinel_data_dir : String
             path to the directory that contains the Level-1C data. In case
             the data is zipped (default when downloaded from Copernicus) specify
@@ -324,20 +326,23 @@ class API:
                                                            resolution,
                                                            path_sen2core,
                                                            storage_dir=storage_dir)
-        # with that information, the zonal statistics can be computed
-        # using the provided shapefile with the object boundaries and
-        # the landuser/ cover information
         # get the tablename of the object spectra table
         if self.__tablenames is None:
             self.set_tablenames()
         tablename_obj_spec = self.__tablenames[2]
-        get_mean_refl(shp_file, fname_s2, acqui_date, tablename_obj_spec)
-
         # parse the metadata and insert it into the database
         metadata = parse_s2xml(metadata_xml)
         insert_scene_metadata(metadata, use_gee=False, raster=fname_s2)
+        # get the scene_id and the acquisition date
+        scene_id = metadata['SCENE_ID']
+        acqui_date = metadata['SENSING_TIME'][0:10]
+        # with that information, the zonal statistics can be computed
+        # using the provided shapefile with the object boundaries and
+        # the landuser/ cover information
+        get_mean_refl(shp_file, fname_s2, acqui_date, scene_id,
+                      tablename_obj_spec)
         # return the SCENE_ID
-        return metadata['SCENE_ID']
+        return scene_id
 
 
     def process_L2data(self, sentinel_data_dir, resolution,
@@ -353,8 +358,6 @@ class API:
 
         Parameters
         ----------
-        acqui_date : String
-            acquisition date to be processed (format: YYYY-MM-DD)
         sentinel_data_dir : String
             path to the directory that contains the Level-1C data. In case
             the data is zipped (default when downloaded from Copernicus) specify
@@ -384,10 +387,14 @@ class API:
         if self.__tablenames is None:
             self.set_tablenames()
         tablename_obj_spec = self.__tablenames[2]
-        get_mean_refl(shp_file, fname_s2, acqui_date, tablename_obj_spec)
 
         # parse the metadata and insert it into the database
         metadata = parse_s2xml(metadata_xml)
         insert_scene_metadata(metadata, use_gee=False, raster=fname_s2)
+        # get the scene_id and the acquisition date
+        scene_id = metadata['SCENE_ID']
+        acqui_date = metadata['SENSING_TIME'][0:10]
+        get_mean_refl(shp_file, fname_s2, acqui_date, scene_id,
+                      tablename_obj_spec)
         # return the SCENE_ID
-        return metadata['SCENE_ID']
+        return scene_id

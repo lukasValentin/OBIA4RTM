@@ -4,7 +4,7 @@
 --
 CREATE TABLE public.s2_landuse(
 	landuse 		INTEGER UNIQUE NOT NULL,	
-	landuse_semantic 	CHARACTER VARYING(50),		
+	landuse_semantic 	CHARACTER VARYING(50),
 	CONSTRAINT s2_landuse_pkey PRIMARY KEY (landuse)	
 );
 
