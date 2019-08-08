@@ -1,6 +1,6 @@
 **OBIA4RTM**
 ------------
-[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375)
+[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375) [![Python 3.6](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
 
 An open-source tool for object-based image analysis for radiative transfer modeling
 using ProSAIL (Prospect5 + 4SAIL).
