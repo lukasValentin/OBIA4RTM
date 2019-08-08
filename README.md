@@ -1,6 +1,7 @@
+[logo]: https://github.com/lukasValentin/OBIA4RTM/blob/master/obia4rtm_logo.JPG "OBIA4RTM logo"
 **OBIA4RTM**
 ------------
-[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375)
+[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375) [![Python 3.6](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/) [![Coverage Status](https://coveralls.io/repos/github/lukasValentin/OBIA4RTM/badge.svg?branch=master)](https://coveralls.io/github/lukasValentin/OBIA4RTM?branch=master)
 
 An open-source tool for object-based image analysis for radiative transfer modeling
 using ProSAIL (Prospect5 + 4SAIL).
@@ -93,8 +94,10 @@ $ conda install -c anaconda numpy
 
 In case your planning to use Google Earth Engine (GEE), make sure to also install
 
+```console
 $ conda install -c conda-forge earthengine-api
 $ conda install -c conda-forge Py6S
+```
 
 See also the instructions [how to use GEE Python API](https://developers.google.com/earth-engine/python_install).
 
@@ -167,4 +170,5 @@ Sample data can be found here: http://dx.doi.org/10.17632/vs55cwssyh.1 showing s
 OBIA4RTM
 --------
 [![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375)
+
 
