@@ -108,7 +108,7 @@ def create_schema():
         cursor.execute(sql)
         con.commit()
     except (ProgrammingError, DatabaseError):
-        logger.info("PostGIS already enabled!", exc_info=True)
+        logger.info("PostGIS already enabled!")
         con.rollback()
         pass
     # enable the HSTORE extension
@@ -117,7 +117,7 @@ def create_schema():
         cursor.execute(sql)
         con.commit()
     except (ProgrammingError, DatabaseError):
-        logger.error("HSTORE already enabled!", exc_info=True)
+        logger.error("HSTORE already enabled!")
         con.rollback()
         pass
 
@@ -167,6 +167,18 @@ def create_schema():
         # log success
         logger.info("Successfully created table '{0}' in schema '{1}'".format(
                 table_name, schema))
+    # create the RMSE function required for inverting the spectra
+    fun_home = install_dir + os.sep + 'SQL' + os.sep + 'Queries_Functions'
+    rmse_fun = fun_home + os.sep + 'rmse_function.sql'
+    sql_statement = create_function_statement(rmse_fun, logger)
+    try:
+        cursor.execute(sql_statement)
+        con.commit()
+    except (DatabaseError, ProgrammingError):
+        logger.error("Creating function '{0}' failed!".format(
+                rmse_fun), exc_info=True)
+        close_logger(logger)
+        sys.exit(sys_exit_message)
     # after iterating, the db connection and the logger can be close
     close_db_connection(con, cursor)
     close_logger(logger)
@@ -210,6 +222,38 @@ def create_sql_statement(sql_file, schema, table_name, logger):
     # now, replace "schema_name" and "table_name" with their actual values
     sql_statement = sql_statement.replace('schema_name', schema)
     sql_statement = sql_statement.replace('table_name', table_name)
+    return sql_statement
+
+
+def create_function_statement(sql_function, logger):
+    """
+    create a SQL statement for creating/ replacing a SQL function
+
+    Parameters
+    ----------
+    sql_function : String
+        file-path to the sql-function
+    logger : logging.Logger
+        for logging errors
+
+    Returns
+    -------
+    sql_statement : String
+        processed and ready-to-execute sql statement
+    """
+    try:
+        fopen = open(sql_function, "r")
+        lines = fopen.readlines()
+        fopen.close()
+    except IOError:
+        logger.error('Failed to read the SQL-script\nReason:', exc_info=True)
+        close_logger(logger)
+        sys.exit(sys_exit_message)
+    # extract the SQL statement
+    # '--' indicates comments
+    comment = '--'
+    sql_statement = [''.join(f.replace("\n","")) for f in lines if comment not in f]
+    sql_statement = ''.join(map(str, sql_statement))
     return sql_statement
 
 

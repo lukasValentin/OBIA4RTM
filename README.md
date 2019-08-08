@@ -66,10 +66,66 @@ Band Number  |	Central wavelength (nm)	|  Bandwidth (nm)  |  Spatial resolution 
 Installation
 ------------
 
-tbd
+The installation of OBIA4RTM is multi-step procedure. It is suggested to start installing all dependencies first and then building the OBIA4RTM package using the setup.py file.
+
+### PostgreSQL and PostGIS installation
+
+The OBIA4RTM backend requires **PostgreSQL** for storing the information in a hybrid database (i.e. mainly relational with some object-oriented features). OBIA4RTM was mainly developed under PostgreSQL 10.9 but it is assumed that higher versions (>11.0) should work as well. For installing PostgreSQL you can refer this [tutorial for Windows](http://www.postgresqltutorial.com/install-postgresql/) or use this [instructions under Ubuntu](https://www.postgresql.org/download/linux/ubuntu/).
+
+After having installed PostgreSQL, **PostGIS** is required to make PostgreSQL become a spatial database. For installation instructions, please see [here](https://postgis.net/install/).
+
+### Python Packages
+
+OBIA4RTM depends on a set of non-standard **Python-3** packages that are required to make the software running. **NOTE** that Python 2.x is not supported by OBIA4RTM as Python2 will reach its end of lifecycle in the near future!
+
+Only the Google Earth Engine Python-API as well as Py6S are optional packages that users might skip. It is recommended to use [Anaconda](https://anaconda.org/anaconda) for the Python package management especially if you are planning to deploy OBIA4RTM under Windows. Especially the Setup of GDAL and the required RTM modules worked out smoothly under Windows when using Anaconda and installling directly from the Anaconda cloud.
+
+You can install the following packages from the Anaconda command prompt:
+
+$ conda install -c conda-forge spectral
+$ conda install -c anaconda scipy
+$ conda install -c anaconda psycopg2
+$ conda install -c conda-forge gdal
+$ conda install -c jgomezdans prosail
+$ conda install -c anaconda numpy
+
+In case your planning to use Google Earth Engine (GEE), make sure to also install
+
+$ conda install -c conda-forge earthengine-api
+$ conda install -c conda-forge Py6S
+
+See also the instructions [how to use GEE Python API](https://developers.google.com/earth-engine/python_install).
+
+### OBIA4RTM setup
+
+First, clone or download OBIA4RTM from Github (as long as no PyPi/ Anaconda package is available):
+
+$ git clone https://github.com/lukasValentin/OBIA4RTM.git
+
+Then go into the OBIA4RTM directory (cd ./OBIA4RTM) and run either 
+
+$ python3 -m pip install .
+
+or 
+
+$ python3 setup.py install
+
+to use either pip or the more advanced egg-installation.
+
+After that, OBIA4RTM **is installed but not ready to use**. Therefore, open a Python3 session and type in
+
+```python
+from OBIA4RTM import install
+install.install()
+```
+This installation script will take care about the database setup (including the creation of tables and functions) and enable the required extensions. Moreover, it will copy some configuration files into a **OBIA4RTM configuration directory** in the user profile. After having successfully run the installation script, OBIA4RTM is ready to use.
 
 Usage Instructions
 ------------------
+
+### Configuring OBIA4RTM
+
+tbd
 
 ### Image Preprocessing
 

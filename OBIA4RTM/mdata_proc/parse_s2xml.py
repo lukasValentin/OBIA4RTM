@@ -52,7 +52,10 @@ def parse_s2xml(xml_file):
     metadata = dict()
     
     # tile id -> scene_id
+    # if condition to account for changes in metadata xml
     tile_id_xml = xmldoc.getElementsByTagName('TILE_ID_2A')
+    if tile_id_xml == []:
+        tile_id_xml = xmldoc.getElementsByTagName('TILE_ID')
     tile_id = tile_id_xml[0].firstChild.nodeValue
     scene_id = tile_id.split(".")[0]
     metadata['SCENE_ID'] = scene_id
@@ -156,9 +159,13 @@ def parse_s2xml(xml_file):
     thcirrus = thcirrus_xml[0].firstChild.nodeValue
     metadata['THIN_CIRRUS_PERCENTAGE'] = thcirrus
     
-    ccover_xml = xmldoc.getElementsByTagName('CLOUD_COVERAGE_PERCENTAGE')
-    ccover = ccover_xml[0].firstChild.nodeValue
-    metadata['CLOUD_COVERAGE_PERCENTAGE'] = ccover
+    # try catch because of version differences in xml file
+    try:
+        ccover_xml = xmldoc.getElementsByTagName('CLOUD_COVERAGE_PERCENTAGE')
+        ccover = ccover_xml[0].firstChild.nodeValue
+        metadata['CLOUD_COVERAGE_PERCENTAGE'] = ccover
+    except IndexError:
+        pass
 
     snowice_xml = xmldoc.getElementsByTagName('SNOW_ICE_PERCENTAGE')
     snowice = snowice_xml[0].firstChild.nodeValue
