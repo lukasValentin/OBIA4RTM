@@ -82,12 +82,14 @@ Only the Google Earth Engine Python-API as well as Py6S are optional packages th
 
 You can install the following packages from the Anaconda command prompt:
 
+```console
 $ conda install -c conda-forge spectral
 $ conda install -c anaconda scipy
 $ conda install -c anaconda psycopg2
 $ conda install -c conda-forge gdal
 $ conda install -c jgomezdans prosail
 $ conda install -c anaconda numpy
+```
 
 In case your planning to use Google Earth Engine (GEE), make sure to also install
 
@@ -100,15 +102,21 @@ See also the instructions [how to use GEE Python API](https://developers.google.
 
 First, clone or download OBIA4RTM from Github (as long as no PyPi/ Anaconda package is available):
 
+```console
 $ git clone https://github.com/lukasValentin/OBIA4RTM.git
+```
 
 Then go into the OBIA4RTM directory (cd ./OBIA4RTM) and run either 
 
+```console
 $ python3 -m pip install .
+```
 
 or 
 
+```console
 $ python3 setup.py install
+```
 
 to use either pip or the more advanced egg-installation.
 
