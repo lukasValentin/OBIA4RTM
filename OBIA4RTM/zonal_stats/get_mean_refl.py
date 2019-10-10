@@ -103,7 +103,7 @@ def get_mean_refl(shp_file, raster_file, acqui_date, scene_id, table_name):
     # determine the min area of an object (determined by S2 spatial resolution)
     # use the "standard" resolution of 20 meters
     # an object must be twice times larger
-    min_area = 20 * 60 * 2
+    min_area = 20 * 20 * 2  # 20 by 20 meters times two as the minimum size constraint
 
     # for requesting the landuse information
     luc_field = 'LU' + acqui_date.replace('-', '')

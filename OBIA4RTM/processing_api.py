@@ -5,25 +5,11 @@ Created on Thu Aug  1 08:46:00 2019
 
 This module is part of OBIA4RTM.
 
+It is the MAIN WRAPPER around the functionalities of the OBIA4RTM software.
+NOTE that the software is at an experimental state and API changes might
+apply frequently whenever bugs, inconsistencies or inefficient code is identified
+
 Copyright (c) 2019 Lukas Graf
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 
 @author: Lukas Graf, graflukas@web.de
 """
@@ -39,11 +25,19 @@ from OBIA4RTM.mdata_proc.handle_gee_metadata import parse_gee_metadata
 from OBIA4RTM.mdata_proc.insert_scene_metadata import insert_scene_metadata
 from OBIA4RTM.zonal_stats.get_mean_refl_ee import get_mean_refl_ee
 from OBIA4RTM.zonal_stats.get_mean_refl import get_mean_refl
+from OBIA4RTM.inversion.inversion import inversion
 
 
 class API:
     """
     this is the main API wrapper class around the OBIA4RTM functionalities
+
+    Usage
+    -----
+    >>> from OBIA4RTM import processing_api         # import the API
+    >>> use_gee = True                              # Google Earth Engine will be used
+    >>> obia4rtm_api = processing_api.API(use_gee)  # construct an API class instance
+    >>> print(obia4rtm_api)                         # should be an object at some location
 
     Parameters
     ----------
@@ -53,6 +47,10 @@ class API:
     obia4rtm_home : String
         directory that contains the config files required for OBIA4RTM.
         If None the default OBIA4RTM home dir (in the user profile) is used
+
+    Returns
+    -------
+    None
     """
     def __init__(self, use_gee, obia4rtm_home=None):
         """
@@ -79,23 +77,25 @@ class API:
                   "path you specified!")
             sys.exit(-1)
         # set the class attribute
-        self.__obia4rtm_home = obia4rtm_home
+        self.obia4rtm_home = obia4rtm_home
 
         # set other class attributes to None unless specified otherwise
 
         # configuration files
-        self.__landcover_cfg = None     # landcover configuration file
-        self.__prosail_cfg = None       # prosail configuration file
-        self.__soil_refl = None         # file with soil reflectance values
+        self.landcover_cfg = None     # landcover configuration file
+        self.prosail_cfg = None       # prosail configuration file
+        self.soil_refl = None         # file with soil reflectance values
         # Database configuration file
-        self.__backend_cgf = None      # table and schema names
+        self.backend_cfg = None      # table and schema names
+        # tablenames
+        self.tablenames = None
 
 
     ###########################################################################
     #
     #       Public SETTER Methods
-    #       only necessary if not the standard OBIA4RTM home directory
-    #       (in the user profile) is used
+    #       only necessary if the standard OBIA4RTM home directory
+    #       (in the user profile) is NOT used
     #
     ###########################################################################
     def set_landcover_cfgfile(self, landcover_cfg):
@@ -107,7 +107,7 @@ class API:
         landcover_cfg : String
             landcover configuration file if not the default file should be used
         """
-        self.__landcover_cfg = landcover_cfg
+        self.landcover_cfg = landcover_cfg
 
 
     def set_prosail_cfgfile(self, prosail_cfg):
@@ -119,7 +119,7 @@ class API:
         prosail_cfg : String
             prosail configuration file if not the default file should be used
         """
-        self.__prosail_cfg = prosail_cfg
+        self.prosail_cfg = prosail_cfg
 
 
     def set_soil_refl_file(self, soil_refl_file):
@@ -132,7 +132,7 @@ class API:
             file with soil reflectance values if not the default file should
             be used
         """
-        self.__soil_refl = soil_refl_file
+        self.soil_refl = soil_refl_file
 
 
     def set_backend_cfgfile(self, backend_cfg):
@@ -144,19 +144,19 @@ class API:
         backend_cfg : String
             backend configuration file if not the default file should be used
         """
-        self.__backend_cfg = backend_cfg
+        self.backend_cfg = backend_cfg
 
 
     def set_tablenames(self):
         """
         sets the tablenames read from backend_cfg file into a list
         """
-        if self.__backend_cfg is None:
-            self.__backend_cfg = self.__obia4rtm_home + os.sep + 'obia4rtm_backend.cfg'
+        if self.backend_cfg is None:
+            self.backend_cfg = self.obia4rtm_home + os.sep + 'obia4rtm_backend.cfg'
 
         parser = ConfigParser()
         try:
-            parser.read(self.__backend_cfg)
+            parser.read(self.backend_cfg)
         except MissingSectionHeaderError:
             raise MissingSectionHeaderError('The obia4rtm_backend.cfg does '\
                          'not fulfil the formal requirements!',
@@ -166,11 +166,15 @@ class API:
         schema = parser.get('schema-setting', 'schema_obia4rtm')
         # read the tablenames
         table_names = []
-        table_names.append(schema + "." + parser.get('schema-setting', 'table_lookuptabe'))
-        table_names.append(schema + "." + parser.get('schema-setting', 'table_inv_results'))
-        table_names.append(schema + "." + parser.get('schema-setting', 'table_object_spectra'))
-        table_names.append(schema + "." + parser.get('schema-setting', 'table_inv_mapping'))
-        self.__tablenames = table_names
+        table_names.append(schema + "." + parser.get('schema-setting',
+                                                     'table_lookuptabe'))
+        table_names.append(schema + "." + parser.get('schema-setting',
+                                                     'table_inv_results'))
+        table_names.append(schema + "." + parser.get('schema-setting',
+                                                     'table_object_spectra'))
+        table_names.append(schema + "." + parser.get('schema-setting',
+                                                     'table_inv_mapping'))
+        self.tablenames = table_names
 
 
     ###########################################################################
@@ -182,7 +186,7 @@ class API:
         """
         prints the OBIA4RTM home directory
         """
-        print("The OBIA4RTM home is: '{}'".format(self.__obia4rtm_home))
+        print("The OBIA4RTM home is: '{}'".format(self.obia4rtm_home))
 
 
     def get_use_gee(self):
@@ -207,7 +211,7 @@ class API:
     def do_gee_preprocessing(self, geom, acqui_date, option, shp_file):
         """
         method to conduct the full workflow (atcorr, cloud and
-        shadow mask, zonal stats ) for imagery derived from Google Earth Engine
+        shadow mask, zonal stats) for imagery derived from Google Earth Engine
 
         Parameters
         ----------
@@ -254,9 +258,9 @@ class API:
         # the retrieved surface reflectance values are then processed to extract
         # per object reflectance values
         # get the tablename of the object spectra table
-        if self.__tablenames is None:
+        if self.tablenames is None:
             self.set_tablenames()
-        tablename_obj_spec = self.__tablenames[2]
+        tablename_obj_spec = self.tablenames[2]
         # return the metadata as this information will be lost otherwise
         # (but is required for the inversion)
         # some formatting is necessary, however
@@ -327,9 +331,9 @@ class API:
                                                            path_sen2core,
                                                            storage_dir=storage_dir)
         # get the tablename of the object spectra table
-        if self.__tablenames is None:
+        if self.tablenames is None:
             self.set_tablenames()
-        tablename_obj_spec = self.__tablenames[2]
+        tablename_obj_spec = self.tablenames[2]
         # parse the metadata and insert it into the database
         metadata = parse_s2xml(metadata_xml)
         insert_scene_metadata(metadata, use_gee=False, raster=fname_s2)
@@ -369,7 +373,6 @@ class API:
             path to the directory the final layer stack should be moved to. If None,
             the layer stack will remain the sentinel_data_dir_l2 in the img folder
 
-
         Returns
         -------
         scene_id:
@@ -384,9 +387,9 @@ class API:
         # using the provided shapefile with the object boundaries and
         # the landuser/ cover information
         # get the tablename of the object spectra table
-        if self.__tablenames is None:
+        if self.tablenames is None:
             self.set_tablenames()
-        tablename_obj_spec = self.__tablenames[2]
+        tablename_obj_spec = self.tablenames[2]
 
         # parse the metadata and insert it into the database
         metadata = parse_s2xml(metadata_xml)
@@ -398,3 +401,69 @@ class API:
                       tablename_obj_spec)
         # return the SCENE_ID
         return scene_id
+
+
+    def do_inversion(self, scene_id, num_best_solutions, luc_classes,
+                     return_specs=True):
+        """
+        this method performs the actual inversion part of OBIA4RTM by taking
+        the derived Sentinel-2 spectra on a per-object base and building a
+        corresponding lookup-table out of ProSAIL forward runs that is then
+        used to do the inversion by applying a RMSE cost function. To enhance
+        the stability of the inversion process, a user-defined number of "best
+        solutions" can be used for the parameter mapping e.g. the mean of the
+        20 best matching inversion results in terms of the lowest RMSE between
+        observed and simulated Sentinel-2 spectra. The results of the inversion
+        process are stored in the OBIA4RTM database.
+
+        Parameters
+        ----------
+        scene_id : String
+           ID of Sentinel-2 imagery. This is the foreign key to match the
+           satellite spectra with the according LUT built from ProSAIL forward
+           runs
+        num_best_solutions : Integer
+            number of "best solutions" of the inversion process in terms of
+            lowest RMSE values between observed and simulated Sentinel-2 spectra
+            Must be in the range between 1 and < number of spectra in the LUT
+        luc_classes : List
+            list of land use or land cover codes to be inverted. The integer
+            codes must be exactly the same as in the ProSail parameterization and
+            the parcel classification.
+        return_specs : Boolean
+            specifies whether inverted spectra should be written to the DB
+            (Default: True) or not. Storing the inverted spectra might help
+            to better understand and evaluate the quality of the performed
+            inversion and might help to further improve the parametrization
+
+        Returns
+        -------
+        status : Integer:
+            status code; zero if everything was working out; -1 instead
+        """
+        # create an inversion class instance using the provided scene id
+        # first, check if the provided scene-id is valid as well as the provided
+        # number of best solutions
+        try:
+            assert scene_id != ''           # scene id must not be an empty string
+            assert num_best_solutions > 0   # number of solutions must be at least 1
+            assert len(luc_classes) > 0     # number of classes must be at least 1
+        except AssertionError:
+            return(-1)
+        inverter = inversion(scene_id)
+        # if not already done yet, set tablenames for storing the results
+        if self.tablenames is None:
+            self.set_tablenames()
+        # determine the tables for the inversion
+        res_table = self.tablenames[1]  # table the results will be written to
+        obj_table = self.tablenames[2]  # table with the obj spectra
+        inv_map = self.tablenames[3]    # mapping of the results
+        # now the inversion method can be called for each of the luc classes
+        for luc in luc_classes:
+            inverter.do_inversion(luc,
+                                  num_best_solutions,
+                                  res_table,
+                                  obj_table,
+                                  inv_map,
+                                  return_specs=return_specs)
+        return(0)
