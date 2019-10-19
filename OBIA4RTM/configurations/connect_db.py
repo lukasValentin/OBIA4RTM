@@ -18,7 +18,8 @@ import OBIA4RTM
 def connect_db():
     """
     connect to PostgreSQL database by using the specifications
-    in 'postgres.ini' File in the root of the OBIA4RTM package
+    in 'postgres.ini' File in the root of the OBIA4RTM home directory
+    stored in the user-profile
     
     Returns
     -------

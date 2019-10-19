@@ -17,7 +17,7 @@ from OBIA4RTM.inversion.distributions import gaussian, uniform
 class lookup_table:
     """
     class for creating and storing biophysical parameters
-    in a lookup table like structure
+    in a lookup table (LUT) like structure
     """
     def __init__(self):
         """
@@ -93,7 +93,7 @@ class lookup_table:
                                self.maxima[self.to_be_inv[0][ii]],
                                int(self.num[self.to_be_inv[0][ii]])
                                )
-            # endif
+
             # append vals to list
             params_temp.append(vals)
         # endfor
@@ -105,7 +105,3 @@ class lookup_table:
         for jj in range(self.lut_size):
             for ii in range(self.inv_params):
                 self.lut[self.to_be_inv[0][ii],jj] = products[jj][ii]
-            # endfor ii (inv_params)
-        # endfor jj (lut_size)
-    # end generate_param_lut
-# end class

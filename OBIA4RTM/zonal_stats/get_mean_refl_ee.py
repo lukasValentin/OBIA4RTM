@@ -93,6 +93,10 @@ def get_mean_refl_ee(shp_file, img, acqui_date, scene_id, table_name):
     # Shapefile handling
     driver = ogr.GetDriverByName('ESRI Shapefile')
     shpfile = driver.Open(shp_file)
+    # check if shapefile exists and could be opened
+    if shpfile is None:
+        raise TypeError("The provided File '{}' is invalid or blocked!".format(
+                shp_file))
     layer = shpfile.GetLayer(0)
     num_objects = layer.GetFeatureCount()
 
@@ -144,7 +148,8 @@ def get_mean_refl_ee(shp_file, img, acqui_date, scene_id, table_name):
         # get a well-know text representation -> required by PostGIS
         wkt = geom.ExportToWkt()
         # get the ID
-        f_id = feature.GetFID()
+        # f_id = feature.GetFID() # depraceted
+        f_id = feature.GetField('id')
         # get the land cover code
         luc = feature.GetField(luc_field)
         # convert to integer coding if luc is provided as text
@@ -247,28 +252,34 @@ def get_mean_refl_ee(shp_file, img, acqui_date, scene_id, table_name):
                     f_id))
             continue
         # otherwise insert the data into the PostgreSQL database
-        query = "INSERT INTO {0} (object_id, acquisition_date, landuse object_geom, "\
-                "b2, b3, b4, b5, b6, b7, b8a, b11, b12, scene_id) VALUES ( " \
-                "{1}, '{2}', {3}, ST_Multi(ST_GeometryFromText('{4}', {5})), " \
-                "{6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, '{15}'}) "\
-                " ON CONFLICT (object_id, scene_id) DO NOTHING;".format(
-                        table_name,
-                        f_id,
-                        acqui_date,
-                        luc,
-                        wkt,
-                        img_epsg,
-                        np.round(B2, 4),
-                        np.round(B3, 4),
-                        np.round(B4, 4),
-                        np.round(B5, 4),
-                        np.round(B6, 4),
-                        np.round(B7, 4),
-                        np.round(B8A, 4),
-                        np.round(B11, 4),
-                        np.round(B12, 4),
-                        scene_id
-                        )
+        try:
+            query = "INSERT INTO {0} (object_id, acquisition_date, landuse, object_geom, "\
+                    "b2, b3, b4, b5, b6, b7, b8a, b11, b12, scene_id) VALUES ( " \
+                    "{1}, '{2}', {3}, ST_Multi(ST_GeometryFromText('{4}', {5})), " \
+                    "{6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, '{15}') "\
+                    " ON CONFLICT (object_id, scene_id) DO NOTHING;".format(
+                            table_name,
+                            f_id,
+                            acqui_date,
+                            luc,
+                            wkt,
+                            img_epsg,
+                            np.round(B2, 4),
+                            np.round(B3, 4),
+                            np.round(B4, 4),
+                            np.round(B5, 4),
+                            np.round(B6, 4),
+                            np.round(B7, 4),
+                            np.round(B8A, 4),
+                            np.round(B11, 4),
+                            np.round(B12, 4),
+                            scene_id
+                            )
+        except ValueError:
+            logger.error("Invalid string syntax encountered when attempting"\
+                         " to generate INSERT for field {0} on '{1}'".format(
+                                     f_id, acqui_date))
+            continue
         # catch errors for single objects accordingly and continue with next
         # object to avoid interrupts of whole workflow
         try:
@@ -286,3 +297,5 @@ def get_mean_refl_ee(shp_file, img, acqui_date, scene_id, table_name):
     layer = None
     # close database connection
     close_db_connection(conn, cursor)
+    # close the logger
+    close_logger(logger)
