@@ -262,9 +262,10 @@ class inversion:
             param_lut = lut.lookup_table()
             param_lut.generate_param_lut(params)
             print("INFO: Start to generate ProSAIL-LUT for class '{0}' with "\
-                  "{1} simulations".format(
+                  "{1} simulations ('{2}')\n".format(
                     lc_sema,
-                    param_lut.lut_size))
+                    param_lut.lut_size,
+                    self.scene_id))
             params_inv = dict()
             for ii in range(param_lut.to_be_inv[0].shape[0]):
                 params_inv[str(ii)] = list_of_params[param_lut.to_be_inv[0][ii]]
@@ -386,7 +387,8 @@ class inversion:
                     self.cursor.execute(insert_statement)
                     self.conn.commit()
                 except DatabaseError:
-                    self.__logger.error("INSERT of synthetic spectra failed!")
+                    self.__logger.error("INSERT of synthetic spectra failed!",
+                                        exc_info=True)
                     continue
             # endfor -> lut_table is finished
 

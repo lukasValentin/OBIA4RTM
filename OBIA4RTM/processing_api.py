@@ -473,3 +473,19 @@ class API:
                                   inv_table,
                                   return_specs=return_specs)
         return(0)
+
+
+if __name__ == "__main__":
+    print("*** Welcome to the OBIA4RTM processing API (OBIA4RTM Core API) ***")
+    print("")
+    print("OBIA4RTM combines object-based image analysis (OBIA) with radiative\n"\
+          "transfer modelling of vegetation (RTM) using spatial databases.\n"\
+          "OBIA4RTM aims to develop a better understanding of plant parameters\n"
+          "at different spatio-temporal scales to optimize e.g. precision farming\n"\
+          "measures and enable local authorities to make better decisions about\n"\
+          "ecological and agricultural questions.\n"
+          "\n"\
+          "If you would like to find out more about OBIA4RTM and its usage refer\n"\
+          "to Github (https://zenodo.org/badge/latestdoi/184379375) and our\n"
+          "recent publications in peer-reviewed journals:\n"\
+          " Graf, Papp, Lang (under review): ...")
