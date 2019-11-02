@@ -7,7 +7,7 @@
 CREATE TABLE schema_name.table_name(
 	object_id 		BIGINT NOT NULL,
 	acquisition_date 	DATE NOT NULL,
-	scene_id		CHARACTER NOT NULL,
+	scene_id		CHARACTER VARYING(255) NOT NULL,
 	inversion_results 	JSON,
 	inversion_errors 	JSON,
 	CONSTRAINT s2_obj_inversion_pkey PRIMARY KEY(object_id, scene_id)

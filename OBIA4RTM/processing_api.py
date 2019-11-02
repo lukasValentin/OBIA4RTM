@@ -455,15 +455,21 @@ class API:
         if self.tablenames is None:
             self.set_tablenames()
         # determine the tables for the inversion
+        inv_table = self.tablenames[0]  # lookup-table for ProSAIL runs
         res_table = self.tablenames[1]  # table the results will be written to
         obj_table = self.tablenames[2]  # table with the obj spectra
         inv_map = self.tablenames[3]    # mapping of the results
+        # construct the lookup table first using the user-provided
+        # parameterizations
+        inverter.gen_lut(inv_map, inv_table)
         # now the inversion method can be called for each of the luc classes
         for luc in luc_classes:
-            inverter.do_inversion(luc,
+            luc_int = int(luc[0])
+            inverter.do_inversion(luc_int,
                                   num_best_solutions,
                                   res_table,
                                   obj_table,
                                   inv_map,
+                                  inv_table,
                                   return_specs=return_specs)
         return(0)

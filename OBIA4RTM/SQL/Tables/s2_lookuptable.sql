@@ -53,7 +53,7 @@ CREATE TABLE schema_name.table_name
   	b11 			DOUBLE PRECISION,
   	b12 			DOUBLE PRECISION,
   -- set primary key
-  	PRIMARY KEY (id, scene_id)
+  	PRIMARY KEY (id, scene_id, landuse)
 )
 WITH (
   OIDS=FALSE

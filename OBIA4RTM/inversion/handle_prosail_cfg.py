@@ -69,26 +69,23 @@ def read_params_per_class(prosail_cfg, landcover_cfg, logger):
         close_logger(logger)
         sys.exit(-1)
     num_lines_per_luc = 13        # number of lines per land cover class
-    offset_rows = 2               # number of rows to be skipped when reading
-    footer_rows = (n_classes - 1) * (num_lines_per_luc)
     # loop over the land cover classes, store results in dictionary
     container = dict()
     try:
-        for section in luc_classes:
-            # read in the params per land cover class using numpy
-            # class_name = section[1]
-            values = np.genfromtxt(prosail_cfg,
-                                   skip_header=offset_rows,
-                                   skip_footer=footer_rows)
-            # store in "container" dictionary
-            container[section] = values
-            # increment offset_rows and footer_rows for next iteration
-            offset_rows =+ num_lines_per_luc + 2
-            footer_rows =- (num_lines_per_luc + 2)
+        values = np.genfromtxt(prosail_cfg, skip_header=0)
     except ValueError:
         logger.error('Failed to read in the config-File', exc_info=True)
         close_logger(logger)
         sys.exit(-1)
+    offset_rows = 0
+    for section in luc_classes:
+        # read in the params per land cover class using numpy
+        # class_name = section[1]
+        vals_per_class = values[offset_rows:offset_rows+num_lines_per_luc,:]
+        # store in "container" dictionary
+        container[section] = vals_per_class
+        # increment offset_rowsfor next iteration
+        offset_rows += num_lines_per_luc
     return container
 # end read_params_per_class
 

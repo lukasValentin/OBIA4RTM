@@ -153,6 +153,9 @@ class inversion:
         """
         queries the relevant scene metadata from the database
         """
+        # check if cursor is closed -> if closed, reconnect to database
+        if self.cursor.closed:
+            self.conn, self.cursor = connect_db.connect_db()
         # database query
         query = "SELECT  acquisition_time, "\
             "scene_id, sun_zenith, obs_zenith, rel_azimuth, sensor "\
@@ -163,7 +166,7 @@ class inversion:
             res = self.cursor.fetchall()[0]
         except DatabaseError:
             self.__logger.error("Querying scene meta for scene '{}' failed".format(
-                    self.scene_id))
+                    self.scene_id), exc_info=True)
             close_logger(self.__logger)
             sys.exit(error_message)
         # make sure that res is not empty
@@ -184,11 +187,7 @@ class inversion:
         self.__sensor = res[5]
 
 
-class lut_inversion(inversion):
-    """
-    extends the inversion super-class for the lookup-table based
-    approach
-    """
+
     def gen_lut(self, inv_mapping_table, inv_table,
                 landcover_config_path=None, prosail_config_path=None,
                 soil_path=None):
@@ -218,6 +217,8 @@ class lut_inversion(inversion):
         --------
         None
         """
+        # get scene metadata first
+        self.get_scene_metadata()
         # basic setup first
         # get S2 sensor-response function
         resampler = get_resampler(self.conn,
@@ -258,7 +259,7 @@ class lut_inversion(inversion):
             lc_sema = lc[1]  # meaning
             # get the ProSAIL parameters
             params = params_container.get(lc)
-            param_lut = lut()
+            param_lut = lut.lookup_table()
             param_lut.generate_param_lut(params)
             print("INFO: Start to generate ProSAIL-LUT for class '{0}' with "\
                   "{1} simulations".format(
@@ -272,13 +273,14 @@ class lut_inversion(inversion):
             # write the metadata into the inversion_mapping table
             insert = "INSERT INTO {0} (acquisition_date, " \
                      "params_to_be_inverted, landuse, sensor, scene_id) " \
-                     "VALUES('{1}', '{2}', {3}, '{4}', '{5}');".format(
+                     "VALUES('{1}', '{2}', {3}, '{4}', '{5}') "\
+                     "ON CONFLICT(scene_id, landuse) DO NOTHING;".format(
                              inv_mapping_table,
                              self.acquisition_date,
                              params_inv_json,
                              lc_code,
                              self.__sensor,
-                             self.__scene_id)
+                             self.scene_id)
             try:
                 self.cursor.execute(insert)
                 self.conn.commit()
@@ -305,7 +307,7 @@ class lut_inversion(inversion):
                 rsoil = param_lut.lut[9,ii]
                 psoil = param_lut.lut[10,ii]
                 hspot = param_lut.lut[11,ii]
-                typelidf = param_lut.lut[15,ii]
+                typelidf = param_lut.lut[12,ii]
                 
                 # run prosail in forward mode -> resulting spectrum is from 
                 # 400 to 2500 nm in 1nm steps
@@ -328,8 +330,8 @@ class lut_inversion(inversion):
                                                typelidf=typelidf,
                                                lidfb=lidfb,
                                                rsoil0=soils[:,0],
-                                               rsoil=1.,
-                                               psoil=1.,
+                                               rsoil=rsoil,
+                                               psoil=psoil,
                                                factor="SDR")
                 # resample to SRF of sensor
                 # perform resampling from 1nm to S2-bands
@@ -347,7 +349,7 @@ class lut_inversion(inversion):
                                     "VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, "\
                                     "{8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, " \
                                     "{18}, {19}, {20}, {21}, {22}, {23}, {24}, {25}, {26}, '{27}', " \
-                                    "{28}, '{29}') ON CONFLICT (id, scene_id) "\
+                                    "{28}, '{29}') ON CONFLICT (id, scene_id, landuse) "\
                                     "DO NOTHING;".format(
                                             inv_table,
                                             ii,
@@ -475,8 +477,9 @@ class lut_inversion(inversion):
             
             # select the biophysical parameters from the xx best solutions in
             # the lut table using the lut ids as keys
-            query = "SELECT {0} FROM s2_lut WHERE id in {1};".format(
+            query = "SELECT {0} FROM {1} WHERE id in {2};".format(
                     sql_snippets,
+                    lut_table,
                     lut_ids)
             try:
                 self.cursor.execute(query)
@@ -539,11 +542,13 @@ class lut_inversion(inversion):
 
 
     def do_inversion(self, land_use, num_solutions, res_table,
-                     object_table, inv_mapping_table, return_specs=True):
+                     object_table, inv_mapping_table, lut_table,
+                     return_specs=True):
         """
         performs inversion on all objects for a given date.
         NOTE: the object reflectance values must be already available in the data
         base.
+        Run gen_lut therefore before!
         Works as a wrapper around the do_object_inversion method
 
         Parameters
@@ -557,6 +562,12 @@ class lut_inversion(inversion):
             (<schema.table>)
         object_table : String
             tablename of table containing the object spectra (<schema.table>)
+        inv_mapping_table : String
+            tablename of the table containing the parameters to be inverted
+            per acqusition date (scene) and land use/ cover class
+        lut_table : String
+            table containing the ProSAIL lut on a per scene and landuse / cover
+            class base
         return_specs : Boolean
             determines whether inverted spectra should be returned (True; default)
 
@@ -571,7 +582,7 @@ class lut_inversion(inversion):
                 " WHERE acquisition_date = '{1}'" \
                 " AND landuse = {2};".format(
                         object_table,
-                        self.acqui_date,
+                        self.acquisition_date,
                         land_use)
         try:
             self.cursor.execute(query)
@@ -581,7 +592,7 @@ class lut_inversion(inversion):
         except Exception:
             self.__logger.error("Could not query objects for acquistion date "\
                                 "'{0}' and LUC {1}".format(
-                    self.acqui_date,
+                    self.acquisition_date,
                     land_use),
                     exc_info=True)
             close_logger(self.__logger)
@@ -590,6 +601,7 @@ class lut_inversion(inversion):
         # get the list of params to be inverted
         query = "SELECT params_to_be_inverted FROM {0}" \
                 " WHERE scene_id = '{1}' AND landuse = {2};".format(
+                        inv_mapping_table,
                         self.scene_id,
                         land_use
                         )
@@ -621,9 +633,14 @@ class lut_inversion(inversion):
         # iterate over all objects to perform the inversion per object
         for ii in range(len(object_ids)):
             object_id = object_ids[ii]
-            resrun = self.do_obj_inversion(object_id, self.acqui_date, land_use, 
-                                           num_solutions, params_list,
-                                           res_table)
+            resrun = self.do_obj_inversion(object_id,
+                                           self.acquisition_date,
+                                           land_use, 
+                                           num_solutions,
+                                           params_list,
+                                           res_table,
+                                           object_table,
+                                           lut_table)
             # in case an error happened continue with next object
             if resrun != 0:
                 continue
