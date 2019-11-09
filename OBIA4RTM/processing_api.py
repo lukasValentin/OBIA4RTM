@@ -464,7 +464,10 @@ class API:
         inverter.gen_lut(inv_map, inv_table)
         # now the inversion method can be called for each of the luc classes
         for luc in luc_classes:
-            luc_int = int(luc[0])
+            try:
+                luc_int = int(luc[0])
+            except TypeError:
+                luc_int = int(luc)
             inverter.do_inversion(luc_int,
                                   num_best_solutions,
                                   res_table,

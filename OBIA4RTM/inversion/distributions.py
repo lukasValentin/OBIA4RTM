@@ -7,6 +7,7 @@ This module is part of OBIA4RTM.
 
 @author: Lukas Graf, graflukas@web.de
 """
+import sys
 from scipy.stats import truncnorm
 import numpy as np
 
@@ -38,7 +39,16 @@ def gaussian(minimum, maximum, num, mean, std):
     lower, upper = (minimum - mean) / std, (maximum - mean) / std
     #rescale the distribution to mean and std
     tn = truncnorm(lower, upper, loc = mean, scale=std)
-    truncated = tn.rvs(num)
+    try:
+        truncated = tn.rvs(num)
+    except ValueError:
+        print('Failed to draw truncated Gaussian value between {0} and {1} '\
+              'from distribution with mean={2} and std={3}'.format(
+                      minimum,
+                      maximum,
+                      mean,
+                      std))
+        sys.exit()
     return truncated
 # end gaussian
 

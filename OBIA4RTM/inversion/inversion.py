@@ -9,7 +9,6 @@ Copyright (c) 2019 Lukas Graf
 
 @author: Lukas Graf, graflukas@web.de
 """
-
 import os
 import sys
 import json
@@ -354,18 +353,18 @@ class inversion:
                                     "DO NOTHING;".format(
                                             inv_table,
                                             ii,
-                                            np.round(n, 2),
-                                            np.round(cab, 2),
-                                            np.round(car, 2),
-                                            np.round(cbrown, 2),
-                                            np.round(cw, 2),
-                                            np.round(cm, 2),
-                                            np.round(lai, 2),
-                                            np.round(lidfa, 2),
-                                            np.round(lidfb, 2),
-                                            np.round(rsoil, 2),
-                                            np.round(psoil, 2),
-                                            np.round(hspot, 2),
+                                            np.round(n, 4),
+                                            np.round(cab, 4),
+                                            np.round(car, 4),
+                                            np.round(cbrown, 4),
+                                            np.round(cw, 4),
+                                            np.round(cm, 4),
+                                            np.round(lai, 4),
+                                            np.round(lidfa, 4),
+                                            np.round(lidfb, 4),
+                                            np.round(rsoil, 4),
+                                            np.round(psoil, 4),
+                                            np.round(hspot, 4),
                                             np.round(self.__tts, 4),
                                             np.round(self.__tto, 4),
                                             np.round(self.__psi, 4),
