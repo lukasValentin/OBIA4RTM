@@ -257,7 +257,14 @@ class inversion:
             lc_code = lc[0]  # code
             lc_sema = lc[1]  # meaning
             # get the ProSAIL parameters
-            params = params_container.get(lc)
+            # if a land cover class is not found skip
+            try:
+                params = params_container.get(lc)
+            except (ValueError, KeyError):
+                self.__logger.warning("Land cover class '{}' specified in config "\
+                                      "file but not found in ProSAIL config - "
+                                      " skipping".format(lc_code))
+                continue
             param_lut = lut.lookup_table()
             param_lut.generate_param_lut(params)
             print("INFO: Start to generate ProSAIL-LUT for class '{0}' with "\
@@ -295,20 +302,25 @@ class inversion:
             for ii in range(param_lut.lut_size):
                 
                 # run ProSAIL for each combination in the LUT
-                n = param_lut.lut[0,ii]
-                cab = param_lut.lut[1,ii]
-                car = param_lut.lut[2,ii]
-                cbrown = param_lut.lut[3,ii]
-                cw = param_lut.lut[4,ii]
-                cm = param_lut.lut[5,ii]
-                lai = param_lut.lut[6,ii]
-                lidfa = param_lut.lut[7,ii]
-                lidfb = param_lut.lut[8,ii]
-                rsoil = param_lut.lut[9,ii]
-                psoil = param_lut.lut[10,ii]
-                hspot = param_lut.lut[11,ii]
-                typelidf = param_lut.lut[12,ii]
-                
+                try:
+                    n = param_lut.lut[0,ii]
+                    cab = param_lut.lut[1,ii]
+                    car = param_lut.lut[2,ii]
+                    cbrown = param_lut.lut[3,ii]
+                    cw = param_lut.lut[4,ii]
+                    cm = param_lut.lut[5,ii]
+                    lai = param_lut.lut[6,ii]
+                    lidfa = param_lut.lut[7,ii]
+                    lidfb = param_lut.lut[8,ii]
+                    rsoil = param_lut.lut[9,ii]
+                    psoil = param_lut.lut[10,ii]
+                    hspot = param_lut.lut[11,ii]
+                    typelidf = param_lut.lut[12,ii]
+                except IndexError:
+                    self.__logger.error("No data available for land cover class "\
+                                        "'{}'".format(lc_code))
+                    close_logger(self.__logger)
+                    return
                 # run prosail in forward mode -> resulting spectrum is from 
                 # 400 to 2500 nm in 1nm steps
                 # use Python ProSAIL bindings
