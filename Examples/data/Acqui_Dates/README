@@ -1,0 +1,4 @@
+Acquisition Dates calculated from Google Earth Engine COPERNICUS/S2_SR collection for the Multiply sample area (2017)
+Results only include scenes with cloudy pixel percentage of less than 20 percent.
+Link to script on GEE: https://code.earthengine.google.com/501cc6eccdb8d3c262ad72e78a158f5a
+
