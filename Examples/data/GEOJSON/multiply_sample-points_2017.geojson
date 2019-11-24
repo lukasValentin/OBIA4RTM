@@ -1,7 +1,6 @@
 {
 "type": "FeatureCollection",
 "name": "multiply_sample-points_2017",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
 "features": [
 { "type": "Feature", "properties": { "FID_": 0, "Id": 515, "ESU": "low", "POINT_X": 701349.81, "POINT_Y": 5351098.34, "Crop": "Silomais" }, "geometry": { "type": "Point", "coordinates": [ 11.71411006598345, 48.281040003197987 ] } },
 { "type": "Feature", "properties": { "FID_": 1, "Id": 515, "ESU": "high", "POINT_X": 701423.65530900005, "POINT_Y": 5350784.22248, "Crop": "Silomais" }, "geometry": { "type": "Point", "coordinates": [ 11.714954616016751, 48.27819365745588 ] } },
