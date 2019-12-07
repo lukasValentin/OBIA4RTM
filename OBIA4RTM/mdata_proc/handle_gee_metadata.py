@@ -121,9 +121,18 @@ def parse_gee_metadata(gee_metadata):
     except KeyError:
         pass
     # more GEE quality information -> might be helpful afterwards
-    metadata['RADIOMETRIC_QUALITY_FLAG'] = gee_metadata['RADIOMETRIC_QUALITY_FLAG']
-    metadata['REFLECTANCE_CONVERSION_CORRECTION'] = gee_metadata['REFLECTANCE_CONVERSION_CORRECTION']
-    metadata['SENSOR_QUALITY_FLAG'] = gee_metadata['SENSOR_QUALITY_FLAG']
+    try:
+        metadata['RADIOMETRIC_QUALITY_FLAG'] = gee_metadata['RADIOMETRIC_QUALITY_FLAG']
+    except KeyError:
+        pass
+    try:
+        metadata['REFLECTANCE_CONVERSION_CORRECTION'] = gee_metadata['REFLECTANCE_CONVERSION_CORRECTION']
+    except KeyError:
+        pass
+    try:
+        metadata['SENSOR_QUALITY_FLAG'] = gee_metadata['SENSOR_QUALITY_FLAG']
+    except KeyError:
+        pass
     # solar irradiance (W/m2)
     metadata['SOLAR_IRRADIANCE_B2'] = gee_metadata['SOLAR_IRRADIANCE_B2']
     metadata['SOLAR_IRRADIANCE_B3'] = gee_metadata['SOLAR_IRRADIANCE_B3']

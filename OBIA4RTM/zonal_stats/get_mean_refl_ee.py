@@ -220,15 +220,21 @@ def get_mean_refl_ee(shp_file, img, acqui_date, scene_id, table_name):
         # only use those bands required for OBIA4RTM
         # multiply with 100 to get % surface reflectance values
         multiplier = 100
-        B2 = meanDictionary.get('B2').getInfo() * multiplier
-        B3 = meanDictionary.get('B3').getInfo() * multiplier
-        B4 = meanDictionary.get('B4').getInfo() * multiplier
-        B5 = meanDictionary.get('B5').getInfo() * multiplier
-        B6 = meanDictionary.get('B6').getInfo() * multiplier
-        B7 = meanDictionary.get('B7').getInfo() * multiplier
-        B8A = meanDictionary.get('B8A').getInfo() * multiplier
-        B11 = meanDictionary.get('B11').getInfo() * multiplier
-        B12 = meanDictionary.get('B12').getInfo() * multiplier
+        # surround with try-except in case only blackfill was found for a object
+        try:
+            B2 = meanDictionary.get('B2').getInfo() * multiplier
+            B3 = meanDictionary.get('B3').getInfo() * multiplier
+            B4 = meanDictionary.get('B4').getInfo() * multiplier
+            B5 = meanDictionary.get('B5').getInfo() * multiplier
+            B6 = meanDictionary.get('B6').getInfo() * multiplier
+            B7 = meanDictionary.get('B7').getInfo() * multiplier
+            B8A = meanDictionary.get('B8A').getInfo() * multiplier
+            B11 = meanDictionary.get('B11').getInfo() * multiplier
+            B12 = meanDictionary.get('B12').getInfo() * multiplier
+        except TypeError:
+            logger.info('No spectral information found for Object with ID {}'.format(
+                    f_id))
+            continue
         # check cloud and shadow mask
         # the cloud and shadow masks are binary
         # if the average is zero everything is OK (=no clouds, no shadows)
