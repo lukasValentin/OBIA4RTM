@@ -34,7 +34,7 @@ def connect_db():
         directory = os.path.dirname(OBIA4RTM.__file__)
         postgres_init = directory + os.sep + 'postgres.ini'
         if not os.path.isfile(postgres_init):
-            print('postgres.ini konnte nicht gefunden werden!')
+            print('postgres.ini could not be found!')
             sys.exit(-1)
         parser.read(postgres_init)
         # and store them in a string
