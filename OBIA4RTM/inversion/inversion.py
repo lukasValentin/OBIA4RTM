@@ -656,6 +656,8 @@ class inversion:
                                            lut_table)
             # in case an error happened continue with next object
             if resrun != 0:
+                # reopen the database connection in case an error occured
+                self.conn, self.cursor = connect_db.connect_db()
                 continue
             # endif
         # endfor

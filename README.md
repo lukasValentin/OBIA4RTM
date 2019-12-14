@@ -6,7 +6,7 @@
 An open-source tool for object-based image analysis for radiative transfer modeling
 using ProSAIL (Prospect5 + 4SAIL) free for non-commercial applications (research and education) under **Creative Commons Attribution-NonCommercial 4.0 International Public License**.
 
-**IMPORTANT**	OBIA4RTM is currently just a first prototype and by **no means** a ready-to-use Python package. Updates will follow in the near future.
+**IMPORTANT**	OBIA4RTM is currently just a first prototype and will continously updated.
 
 About OBIA4RTM
 --------------
