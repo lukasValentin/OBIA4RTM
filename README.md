@@ -6,7 +6,7 @@
 An open-source tool for object-based image analysis for radiative transfer modeling
 using ProSAIL (Prospect5 + 4SAIL) free for non-commercial applications (research and education) under **Creative Commons Attribution-NonCommercial 4.0 International Public License**.
 
-**IMPORTANT**	OBIA4RTM is currently just a first prototype and will continously updated.
+**IMPORTANT**	OBIA4RTM is currently just a first prototype and will continously updated. Therefore, **contributions** (see below) are welcomed!
 
 About OBIA4RTM
 --------------
@@ -22,6 +22,20 @@ The biophysical parameter retrieval from optical imagery by means of radiative t
 
 OBIA4RTM relies therefore on two main pillars: It describes plant spectra by means of physical equations that are universally applicable by using RTM and it introduces the concept of spatial autocorrelation to reduce redundancies and provide more meaningful image objects by means of OBIA. It is thereby capable to provide vegetation parameter retrieval techniques that are not bound by temporal or geographic restrictions. Furthermore, **OBIA4RTM directly addresses objects and, thus, human needs** as humans tend not to think in artificial spatial units (i.e. pixels)
 but in terms of tangible entities such as single field patches or individual trees in an orchard.
+
+Contributing
+------------
+
+Contribution to OBIA4RTM is more than welcomed! My time resources are limited and in case you are interested in the topic and you have ideas about
+
+- improving the code (since it is not always implemented very efficiently ;) )
+- adding additional features
+- testing the functionalities and reporting bugs
+- improving the usability
+- etc.
+
+you are invited to join!
+
 
 Workflow
 --------
@@ -129,14 +143,26 @@ After that, OBIA4RTM **is installed but not ready to use**. Therefore, open a Py
 from OBIA4RTM import install
 install.install()
 ```
-This installation script will take care about the database setup (including the creation of tables and functions) and enable the required extensions. Moreover, it will copy some configuration files into a **OBIA4RTM configuration directory** in the user profile. After having successfully run the installation script, OBIA4RTM is ready to use.
+This installation script will take care about the database setup (including the creation of tables and functions) and enable the required extensions. Moreover, it will copy some configuration files into a **OBIA4RTM home directory** in the user profile. After having successfully run the installation script, OBIA4RTM is ready to use.
 
 Usage Instructions
 ------------------
 
 ### Configuring OBIA4RTM
 
-tbd
+OBIA4RTM has a set of configuration files which are important for running the software:
+
+- a configuration file that holds the **connection parameters of the PostgreSQL backend database** (*'postgres.ini'*). In case you want to use a different database instead of the default one, you have to set the connection parameters accordingly.
+
+- a **configuration file specifying the table and schema names in the database** (*'obia4rtm_backend.cfg'*). Most likely you will only have to change something in there in case you want to use additional database schemes.
+
+- a file that holds the soil spectra. Per default, the **soil spectra** offered by PyProsail are used (*'soil_relfectance.txt'*). However, it is also possible to add a custom soil spectrum in case, for instance, in-situ reference information for a specific region is available. Since the handling of external files is not very convenient it is `**planned to integrate the soil spectra directly into the OBIA4RTM database`**.
+
+- a file specifying the **parameterization of the ProSAIL lookup table(s)** (*'prosail.txt'*) per land use/ cover class. Since the handling of this configuration file is also not very convenient it is planned to change the layout of the file and the way the parameters are set in a future release of the software.
+
+- an additional file mapping the codes and semantic defintion of the **land cover/ land use classes** to be used in OBIA4RTM (*'landcover.cfg*). Whenever you are about to add a new land use/ cover class you have to change the information in this file. Most likely, however, this will be also changed in a future version of the software.
+
+All the files are located in the **`OBIA4RTM home directory`** which can be found in the user directory once OBIA4RTM was successfully installed (see section above). Most often users will want to chnage the ProSAIL configuration file since this file is essential for running the ProSAIL forward simulations and hence the derivation of plant parameters. Please note that the overall structure of the files must be maintained as otherwise I/O-related errors are very likely to occur. Therefore, it might be safer to keep a copy of the original files that came with the installation whenever you are changing something.
 
 ### Image Preprocessing
 
@@ -159,13 +185,17 @@ For demonstration, some sample code is available in a Jupyter Notebook https://g
 
 ### Inversion
 
-tbd
+The inversion (i.e. derivation of plant biochemical and biophysical parameters) is done numerically since the invserse of the radiative transfer equations is not defined analytically. OBIA4RTM therefore uses a cost function to find the closest match between the satellite-derived and ProSAIL-modelled spectra per land use/cover class. Currently, only the **root mean squared error (RMSE)** is supported as cost function since it is very simple and computational effecient. Future versions of OBIA4RTM might also include additional and more advanced cost functions. To ensure the **numerical stability of the inversion** the user can specify that the average of the best *n* solutions is used in terms of the lowest RMSE. *n* can range between 1 and *N*, where *N* is the number of spectra in the LUT even that makes not really sense from a physical point of view since the average of all spectra in the LUT will most likely not correspond to a physically meaningful solution.
 
 
 Demodata produced with OBIA4RTM
 -------------------------------
 
 Sample data can be found here: http://dx.doi.org/10.17632/vs55cwssyh.1 showing some Sentinel-2 data that was processed using OBIA4RTM in an agricultural area in Southern Germany.
+
+Publications
+------------
+coming soon
 
 OBIA4RTM
 --------
