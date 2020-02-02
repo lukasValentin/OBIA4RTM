@@ -8,6 +8,8 @@ using ProSAIL (Prospect5 + 4SAIL) free for non-commercial applications (research
 
 **IMPORTANT**	OBIA4RTM is currently just a first prototype and will continously updated. Therefore, **contributions** (see below) are welcomed!
 
+If you'd like to see how **`OBIA4RTM works in practice`** have a look at this [new repository](https://github.com/lukasValentin/OBIA4RTM-Agricultural-Example) that provides some insights into and results from an agricultural use case.
+
 About OBIA4RTM
 --------------
 
