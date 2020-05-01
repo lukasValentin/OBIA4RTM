@@ -20,7 +20,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('.'))
-
+sys.path.insert(0, '/home/docs/checkouts/readthedocs.org/user_builds/obia4rtm/envs/latest/lib/python3.7/site-packages/OBIA4RTM-1.0-py3.6.egg')
 
 # -- General configuration ------------------------------------------------
 
