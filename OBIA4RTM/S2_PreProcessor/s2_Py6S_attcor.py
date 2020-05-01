@@ -220,7 +220,8 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 """
-from Py6S import PredefinedWavelengths, SixS, Wavelength, AtmosProfile, AeroProfile, Geometry, OutputParsingError
+from Py6S import (PredefinedWavelengths, SixS, Wavelength, AtmosProfile,
+                  AeroProfile, Geometry, OutputParsingError)
 import datetime
 import math
 import os
@@ -251,7 +252,8 @@ class s2_Py6S_atcorr:
         with open(os.path.dirname(OBIA4RTM.__file__) + os.sep + 'OBIA4RTM_HOME',
                   'r') as data:
             obia4rtm_dir = data.readline()
-        self.sixS_install_dir = obia4rtm_dir + os.sep + 'sixS'+  os.sep + 'src' + os.sep + '6SV1.1'
+        self.sixS_install_dir = obia4rtm_dir + os.sep + 'sixS'+  os.sep + \
+        'src' + os.sep + '6SV1.1'
         # make sure that 6S is installed
         if not os.path.isdir(self.sixS_install_dir):
             print("Error: 6S is not installed on your computer or cannot be found!\n"\

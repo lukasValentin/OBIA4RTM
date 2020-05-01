@@ -9,3 +9,7 @@ TODOS.txt
 build/
 dist/
 OBIA4RTM.egg-info/
+_build/
+_static/
+_templates/
+*.bat
