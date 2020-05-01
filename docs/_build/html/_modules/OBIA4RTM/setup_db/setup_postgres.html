@@ -1,0 +1,326 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.setup_db.setup_postgres &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.setup_db.setup_postgres</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Thu Jul 18 15:08:29 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">connect</span><span class="p">,</span> <span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span>
+<span class="kn">from</span> <span class="nn">psycopg2.extensions</span> <span class="kn">import</span> <span class="n">ISOLATION_LEVEL_AUTOCOMMIT</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.connect_db</span> <span class="kn">import</span> <span class="n">connect_db</span><span class="p">,</span> <span class="n">close_db_connection</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.connect_db</span> <span class="kn">import</span> <span class="n">get_db_connection_details</span>
+
+
+<div class="viewcode-block" id="setupDataBase"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.setup_postgres.setupDataBase">[docs]</a><span class="k">class</span> <span class="nc">setupDataBase</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    class for setting up a PostgresSQL database as backend for OBIA4RTM</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        class constructor</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># set the path to SQL-scripts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sql_home</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;SQL&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__postgres_params</span> <span class="o">=</span> <span class="n">get_db_connection_details</span><span class="p">()</span>
+        <span class="c1"># setup connection and cursor to database</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="setupDataBase.connect_to_postgres"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.setup_postgres.setupDataBase.connect_to_postgres">[docs]</a>    <span class="k">def</span> <span class="nf">connect_to_postgres</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        connects to default Postgres database running on specified host in</span>
+<span class="sd">        postgres.ini file to create the OBIA4RTM Postgres database</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        con : psycopg2 Database Connection</span>
+<span class="sd">            Connection to DEFAULT Postges database (not OBIA4RTM database)</span>
+<span class="sd">        cursor : psycopg2 Database Cursor</span>
+<span class="sd">            Cursor for this default database</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># host and password for DEFAULT postgres database</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__postgres_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;POSTGRESQL&#39;</span><span class="p">,</span> <span class="s1">&#39;host&#39;</span><span class="p">)</span>
+        <span class="n">pw</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__postgres_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;POSTGRESQL&#39;</span><span class="p">,</span> <span class="s1">&#39;password&#39;</span><span class="p">)</span>
+        <span class="c1"># default database name is postgres</span>
+        <span class="n">db_name</span> <span class="o">=</span> <span class="s1">&#39;postgres&#39;</span>
+        <span class="c1"># user is postgres</span>
+        <span class="n">db_user</span> <span class="o">=</span> <span class="s1">&#39;postgres&#39;</span>
+        <span class="c1"># connect to default database</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">con</span> <span class="o">=</span> <span class="n">connect</span><span class="p">(</span><span class="n">dbname</span><span class="o">=</span><span class="n">db_name</span><span class="p">,</span>
+                          <span class="n">user</span><span class="o">=</span><span class="n">db_user</span><span class="p">,</span>
+                          <span class="n">host</span><span class="o">=</span><span class="n">host</span><span class="p">,</span>
+                          <span class="n">password</span><span class="o">=</span><span class="n">pw</span><span class="p">)</span>
+            <span class="n">cursor</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">DatabaseError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Connection to default Postgres Database failed!</span><span class="se">\n</span><span class="s1">Reason: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">err</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">con</span><span class="p">,</span> <span class="n">cursor</span></div>
+
+
+<div class="viewcode-block" id="setupDataBase.create_OBIA4RTM_DB"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.setup_postgres.setupDataBase.create_OBIA4RTM_DB">[docs]</a>    <span class="k">def</span> <span class="nf">create_OBIA4RTM_DB</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create the OBIA4RTM database using the specification of the postgres.uni</span>
+<span class="sd">        file</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        status : Integer</span>
+<span class="sd">            zero, if everything was OK</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># open connection to default postgres database</span>
+        <span class="n">con</span><span class="p">,</span> <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connect_to_postgres</span><span class="p">()</span>
+        <span class="c1"># set autocommit to allow for the creation of databases</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">set_isolation_level</span><span class="p">(</span><span class="n">ISOLATION_LEVEL_AUTOCOMMIT</span><span class="p">)</span>
+        <span class="c1"># use the name of the OBIA4RTM database parsed from the postgres.ini file</span>
+        <span class="n">obia4rtm_db_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__postgres_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;POSTGRESQL&#39;</span><span class="p">,</span> <span class="s1">&#39;dbname&#39;</span><span class="p">)</span>
+        <span class="c1"># parse the SQL script for setting up the database</span>
+        <span class="n">sql_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sql_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Tables&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;setup_obia4rtm_db.sql&#39;</span>
+        <span class="c1"># try to read in the SQL-statement of the script and replace the</span>
+        <span class="c1"># the database-name accordingly</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fopen</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">sql_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="n">fopen</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+            <span class="n">fopen</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">IOError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to read the SQL-script</span><span class="se">\n</span><span class="s1">Reason: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="p">))</span>
+        <span class="c1"># extract the SQL statement</span>
+        <span class="c1"># &#39;--&#39; indicates comments</span>
+        <span class="n">comment</span> <span class="o">=</span> <span class="s1">&#39;--&#39;</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">comment</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">sql_statement</span><span class="p">))</span>
+        <span class="c1"># replace the default database-name</span>
+        <span class="n">default_db_name</span> <span class="o">=</span> <span class="s2">&quot;OBIA4RTM&quot;</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="n">sql_statement</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">default_db_name</span><span class="p">,</span> <span class="n">obia4rtm_db_name</span><span class="p">)</span>
+        <span class="c1"># run the statement to create the database</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql_statement</span><span class="p">)</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Setup of DB &#39;</span><span class="si">{0}</span><span class="s2">&#39; failed!</span><span class="se">\n</span><span class="s2">Reason: </span><span class="si">{1}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">obia4rtm_db_name</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span>
+        <span class="c1"># close the connection as it won&#39;t be used anymore</span>
+        <span class="n">close_db_connection</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">cursor</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="setupDataBase.enable_extensions"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.setup_postgres.setupDataBase.enable_extensions">[docs]</a>    <span class="k">def</span> <span class="nf">enable_extensions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">        enables PostGIS and HSTORE extension required for OBIA4RTM</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># connect to the created database</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span> <span class="o">=</span> <span class="n">connect_db</span><span class="p">()</span>
+        <span class="c1"># enable the PostGIS extension</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;CREATE EXTENSION PostGIS;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">ProgrammingError</span><span class="p">,</span> <span class="n">DatabaseError</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;PostGIS setup failed!&quot;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># enable the HSTORE extension</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;CREATE EXTENSION HSTORE;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">ProgrammingError</span><span class="p">,</span> <span class="n">DatabaseError</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;HSTORE setup failed!&quot;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="setupDataBase.setup_public_tables"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.setup_postgres.setupDataBase.setup_public_tables">[docs]</a>    <span class="k">def</span> <span class="nf">setup_public_tables</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        setups all those tables, that are required in the public schema</span>
+<span class="sd">        of the OBIa4RTM backend database</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># the following tables are in the public schema and are created</span>
+        <span class="c1"># by the according sql-scripts</span>
+        <span class="c1"># the s2_bands table is a bit special and follows</span>
+        <span class="n">public_tables</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;s2_landuse.sql&#39;</span><span class="p">,</span> <span class="s1">&#39;scene_metadata.sql&#39;</span><span class="p">]</span>
+        <span class="c1"># &#39;--&#39; indicates comments</span>
+        <span class="n">comment</span> <span class="o">=</span> <span class="s1">&#39;--&#39;</span>
+        <span class="c1"># loop over scripts</span>
+        <span class="k">for</span> <span class="n">sql_file</span> <span class="ow">in</span> <span class="n">public_tables</span><span class="p">:</span>
+            <span class="n">sql_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sql_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Tables&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">sql_file</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">fopen</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">sql_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+                <span class="n">lines</span> <span class="o">=</span> <span class="n">fopen</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+                <span class="n">fopen</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">IOError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to read the SQL-script</span><span class="si">{0}</span><span class="se">\n</span><span class="s1">Reason: </span><span class="si">{1}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">sql_file</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span>
+            <span class="c1"># extract the SQL statement</span>
+            <span class="n">sql_statement</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">comment</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+            <span class="n">sql_statement</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">sql_statement</span><span class="p">))</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql_statement</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Execution of script &#39;</span><span class="si">{0}</span><span class="s2">&#39; failed!</span><span class="se">\n</span><span class="s2">Reason: </span><span class="si">{1}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">sql_file</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span>
+        <span class="c1"># end loop</span>
+        <span class="c1"># now read in the Sentinel-2 bands sql script and execute it</span>
+        <span class="n">s2_band_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sql_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Tables&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;s2_bands.sql&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fopen</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">s2_band_table</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="n">fopen</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+            <span class="n">fopen</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">IOError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to read the SQL-script</span><span class="si">{0}</span><span class="se">\n</span><span class="s1">Reason: </span><span class="si">{1}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">sql_file</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span>
+        <span class="c1"># extract the sql-statement</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">comment</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+        <span class="c1"># the first 12 lines form the first statement for creating the table</span>
+        <span class="n">sql_statement_1</span> <span class="o">=</span> <span class="n">sql_statement</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span>
+        <span class="n">sql_statement_1</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">sql_statement_1</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql_statement_1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Execution of script &#39;</span><span class="si">{0}</span><span class="s2">&#39; failed!</span><span class="se">\n</span><span class="s2">Reason: </span><span class="si">{1}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sql_file</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span>
+        <span class="c1"># the next lines must be executed line by line as they populate the</span>
+        <span class="c1"># table created above with the necessary data</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="n">sql_statement</span><span class="p">[</span><span class="mi">14</span><span class="p">::]</span>
+        <span class="c1"># iterate over the single lines(=SQL statements) to populate the table</span>
+        <span class="k">for</span> <span class="n">sql</span> <span class="ow">in</span> <span class="n">sql_statement</span><span class="p">:</span>
+            <span class="c1"># leave out empty lines</span>
+            <span class="k">if</span> <span class="n">sql</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+                <span class="k">continue</span></div>
+        <span class="c1"># end iterate over statements</span>
+
+
+<div class="viewcode-block" id="setupDataBase.setup_public_functions"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.setup_postgres.setupDataBase.setup_public_functions">[docs]</a>    <span class="k">def</span> <span class="nf">setup_public_functions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        setups the RMSE function used in OBIA4RTM for doing the inversion</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># name and location of the sql script with RMSe function</span>
+        <span class="n">sql_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sql_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Queries_Functions&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;rmse_function.sql&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fopen</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">sql_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="n">fopen</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+            <span class="n">fopen</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">IOError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to read the SQL-script</span><span class="si">{0}</span><span class="se">\n</span><span class="s1">Reason: </span><span class="si">{1}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sql_file</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span>
+        <span class="c1"># &#39;--&#39; indicates comments</span>
+        <span class="n">comment</span> <span class="o">=</span> <span class="s1">&#39;--&#39;</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">comment</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">sql_statement</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql_statement</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Execution of script &#39;</span><span class="si">{0}</span><span class="s2">&#39; failed!</span><span class="se">\n</span><span class="s2">Reason: </span><span class="si">{1}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sql_file</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="setupDataBase.setup_backend"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.setup_postgres.setupDataBase.setup_backend">[docs]</a>    <span class="k">def</span> <span class="nf">setup_backend</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        runs the whole setup-procedure for creating the OBIA4RTM backend</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># first the OBIA4RTM database needs to be created</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Settting up OBIA4RTM PostgreSQL backend&#39;</span><span class="p">)</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_OBIA4RTM_DB</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;OBIA4RTM backend setup failed!&#39;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># enable the PostGIS and Hstore extensions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">enable_extensions</span><span class="p">()</span>
+        <span class="c1"># then create the public tables and functions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup_public_tables</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup_public_functions</span><span class="p">()</span>
+        <span class="c1"># at the end, close the database connection</span>
+        <span class="n">close_db_connection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__con</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__cursor</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Successfully set up OBIA4RTM backend!&#39;</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

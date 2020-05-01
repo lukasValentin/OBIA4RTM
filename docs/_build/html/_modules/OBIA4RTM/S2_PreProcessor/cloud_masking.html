@@ -1,0 +1,501 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.S2_PreProcessor.cloud_masking &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.S2_PreProcessor.cloud_masking</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Sun Jul 28 10:18:46 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM (GEE extension) with many parts taken directly</span>
+<span class="sd">from https://github.com/samsammurphy/cloud-masking-sentinel2/blob/master/cloud-masking-sentinel2.ipynb</span>
+<span class="sd">(available under Apache 2.0 license)</span>
+
+<span class="sd">Slight changes were applied to translate the original code provided as Jupyter</span>
+<span class="sd">Notebook into the OBIA4RTM architecture. Functionalities were not altered.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf, Sam Murphy</span>
+
+
+<span class="sd">                                 Apache License</span>
+<span class="sd">                           Version 2.0, January 2004</span>
+<span class="sd">                        http://www.apache.org/licenses/</span>
+
+<span class="sd">   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION</span>
+
+<span class="sd">   1. Definitions.</span>
+
+<span class="sd">      &quot;License&quot; shall mean the terms and conditions for use, reproduction,</span>
+<span class="sd">      and distribution as defined by Sections 1 through 9 of this document.</span>
+
+<span class="sd">      &quot;Licensor&quot; shall mean the copyright owner or entity authorized by</span>
+<span class="sd">      the copyright owner that is granting the License.</span>
+
+<span class="sd">      &quot;Legal Entity&quot; shall mean the union of the acting entity and all</span>
+<span class="sd">      other entities that control, are controlled by, or are under common</span>
+<span class="sd">      control with that entity. For the purposes of this definition,</span>
+<span class="sd">      &quot;control&quot; means (i) the power, direct or indirect, to cause the</span>
+<span class="sd">      direction or management of such entity, whether by contract or</span>
+<span class="sd">      otherwise, or (ii) ownership of fifty percent (50%) or more of the</span>
+<span class="sd">      outstanding shares, or (iii) beneficial ownership of such entity.</span>
+
+<span class="sd">      &quot;You&quot; (or &quot;Your&quot;) shall mean an individual or Legal Entity</span>
+<span class="sd">      exercising permissions granted by this License.</span>
+
+<span class="sd">      &quot;Source&quot; form shall mean the preferred form for making modifications,</span>
+<span class="sd">      including but not limited to software source code, documentation</span>
+<span class="sd">      source, and configuration files.</span>
+
+<span class="sd">      &quot;Object&quot; form shall mean any form resulting from mechanical</span>
+<span class="sd">      transformation or translation of a Source form, including but</span>
+<span class="sd">      not limited to compiled object code, generated documentation,</span>
+<span class="sd">      and conversions to other media types.</span>
+
+<span class="sd">      &quot;Work&quot; shall mean the work of authorship, whether in Source or</span>
+<span class="sd">      Object form, made available under the License, as indicated by a</span>
+<span class="sd">      copyright notice that is included in or attached to the work</span>
+<span class="sd">      (an example is provided in the Appendix below).</span>
+
+<span class="sd">      &quot;Derivative Works&quot; shall mean any work, whether in Source or Object</span>
+<span class="sd">      form, that is based on (or derived from) the Work and for which the</span>
+<span class="sd">      editorial revisions, annotations, elaborations, or other modifications</span>
+<span class="sd">      represent, as a whole, an original work of authorship. For the purposes</span>
+<span class="sd">      of this License, Derivative Works shall not include works that remain</span>
+<span class="sd">      separable from, or merely link (or bind by name) to the interfaces of,</span>
+<span class="sd">      the Work and Derivative Works thereof.</span>
+
+<span class="sd">      &quot;Contribution&quot; shall mean any work of authorship, including</span>
+<span class="sd">      the original version of the Work and any modifications or additions</span>
+<span class="sd">      to that Work or Derivative Works thereof, that is intentionally</span>
+<span class="sd">      submitted to Licensor for inclusion in the Work by the copyright owner</span>
+<span class="sd">      or by an individual or Legal Entity authorized to submit on behalf of</span>
+<span class="sd">      the copyright owner. For the purposes of this definition, &quot;submitted&quot;</span>
+<span class="sd">      means any form of electronic, verbal, or written communication sent</span>
+<span class="sd">      to the Licensor or its representatives, including but not limited to</span>
+<span class="sd">      communication on electronic mailing lists, source code control systems,</span>
+<span class="sd">      and issue tracking systems that are managed by, or on behalf of, the</span>
+<span class="sd">      Licensor for the purpose of discussing and improving the Work, but</span>
+<span class="sd">      excluding communication that is conspicuously marked or otherwise</span>
+<span class="sd">      designated in writing by the copyright owner as &quot;Not a Contribution.&quot;</span>
+
+<span class="sd">      &quot;Contributor&quot; shall mean Licensor and any individual or Legal Entity</span>
+<span class="sd">      on behalf of whom a Contribution has been received by Licensor and</span>
+<span class="sd">      subsequently incorporated within the Work.</span>
+
+<span class="sd">   2. Grant of Copyright License. Subject to the terms and conditions of</span>
+<span class="sd">      this License, each Contributor hereby grants to You a perpetual,</span>
+<span class="sd">      worldwide, non-exclusive, no-charge, royalty-free, irrevocable</span>
+<span class="sd">      copyright license to reproduce, prepare Derivative Works of,</span>
+<span class="sd">      publicly display, publicly perform, sublicense, and distribute the</span>
+<span class="sd">      Work and such Derivative Works in Source or Object form.</span>
+
+<span class="sd">   3. Grant of Patent License. Subject to the terms and conditions of</span>
+<span class="sd">      this License, each Contributor hereby grants to You a perpetual,</span>
+<span class="sd">      worldwide, non-exclusive, no-charge, royalty-free, irrevocable</span>
+<span class="sd">      (except as stated in this section) patent license to make, have made,</span>
+<span class="sd">      use, offer to sell, sell, import, and otherwise transfer the Work,</span>
+<span class="sd">      where such license applies only to those patent claims licensable</span>
+<span class="sd">      by such Contributor that are necessarily infringed by their</span>
+<span class="sd">      Contribution(s) alone or by combination of their Contribution(s)</span>
+<span class="sd">      with the Work to which such Contribution(s) was submitted. If You</span>
+<span class="sd">      institute patent litigation against any entity (including a</span>
+<span class="sd">      cross-claim or counterclaim in a lawsuit) alleging that the Work</span>
+<span class="sd">      or a Contribution incorporated within the Work constitutes direct</span>
+<span class="sd">      or contributory patent infringement, then any patent licenses</span>
+<span class="sd">      granted to You under this License for that Work shall terminate</span>
+<span class="sd">      as of the date such litigation is filed.</span>
+
+<span class="sd">   4. Redistribution. You may reproduce and distribute copies of the</span>
+<span class="sd">      Work or Derivative Works thereof in any medium, with or without</span>
+<span class="sd">      modifications, and in Source or Object form, provided that You</span>
+<span class="sd">      meet the following conditions:</span>
+
+<span class="sd">      (a) You must give any other recipients of the Work or</span>
+<span class="sd">          Derivative Works a copy of this License; and</span>
+
+<span class="sd">      (b) You must cause any modified files to carry prominent notices</span>
+<span class="sd">          stating that You changed the files; and</span>
+
+<span class="sd">      (c) You must retain, in the Source form of any Derivative Works</span>
+<span class="sd">          that You distribute, all copyright, patent, trademark, and</span>
+<span class="sd">          attribution notices from the Source form of the Work,</span>
+<span class="sd">          excluding those notices that do not pertain to any part of</span>
+<span class="sd">          the Derivative Works; and</span>
+
+<span class="sd">      (d) If the Work includes a &quot;NOTICE&quot; text file as part of its</span>
+<span class="sd">          distribution, then any Derivative Works that You distribute must</span>
+<span class="sd">          include a readable copy of the attribution notices contained</span>
+<span class="sd">          within such NOTICE file, excluding those notices that do not</span>
+<span class="sd">          pertain to any part of the Derivative Works, in at least one</span>
+<span class="sd">          of the following places: within a NOTICE text file distributed</span>
+<span class="sd">          as part of the Derivative Works; within the Source form or</span>
+<span class="sd">          documentation, if provided along with the Derivative Works; or,</span>
+<span class="sd">          within a display generated by the Derivative Works, if and</span>
+<span class="sd">          wherever such third-party notices normally appear. The contents</span>
+<span class="sd">          of the NOTICE file are for informational purposes only and</span>
+<span class="sd">          do not modify the License. You may add Your own attribution</span>
+<span class="sd">          notices within Derivative Works that You distribute, alongside</span>
+<span class="sd">          or as an addendum to the NOTICE text from the Work, provided</span>
+<span class="sd">          that such additional attribution notices cannot be construed</span>
+<span class="sd">          as modifying the License.</span>
+
+<span class="sd">      You may add Your own copyright statement to Your modifications and</span>
+<span class="sd">      may provide additional or different license terms and conditions</span>
+<span class="sd">      for use, reproduction, or distribution of Your modifications, or</span>
+<span class="sd">      for any such Derivative Works as a whole, provided Your use,</span>
+<span class="sd">      reproduction, and distribution of the Work otherwise complies with</span>
+<span class="sd">      the conditions stated in this License.</span>
+
+<span class="sd">   5. Submission of Contributions. Unless You explicitly state otherwise,</span>
+<span class="sd">      any Contribution intentionally submitted for inclusion in the Work</span>
+<span class="sd">      by You to the Licensor shall be under the terms and conditions of</span>
+<span class="sd">      this License, without any additional terms or conditions.</span>
+<span class="sd">      Notwithstanding the above, nothing herein shall supersede or modify</span>
+<span class="sd">      the terms of any separate license agreement you may have executed</span>
+<span class="sd">      with Licensor regarding such Contributions.</span>
+
+<span class="sd">   6. Trademarks. This License does not grant permission to use the trade</span>
+<span class="sd">      names, trademarks, service marks, or product names of the Licensor,</span>
+<span class="sd">      except as required for reasonable and customary use in describing the</span>
+<span class="sd">      origin of the Work and reproducing the content of the NOTICE file.</span>
+
+<span class="sd">   7. Disclaimer of Warranty. Unless required by applicable law or</span>
+<span class="sd">      agreed to in writing, Licensor provides the Work (and each</span>
+<span class="sd">      Contributor provides its Contributions) on an &quot;AS IS&quot; BASIS,</span>
+<span class="sd">      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or</span>
+<span class="sd">      implied, including, without limitation, any warranties or conditions</span>
+<span class="sd">      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A</span>
+<span class="sd">      PARTICULAR PURPOSE. You are solely responsible for determining the</span>
+<span class="sd">      appropriateness of using or redistributing the Work and assume any</span>
+<span class="sd">      risks associated with Your exercise of permissions under this License.</span>
+
+<span class="sd">   8. Limitation of Liability. In no event and under no legal theory,</span>
+<span class="sd">      whether in tort (including negligence), contract, or otherwise,</span>
+<span class="sd">      unless required by applicable law (such as deliberate and grossly</span>
+<span class="sd">      negligent acts) or agreed to in writing, shall any Contributor be</span>
+<span class="sd">      liable to You for damages, including any direct, indirect, special,</span>
+<span class="sd">      incidental, or consequential damages of any character arising as a</span>
+<span class="sd">      result of this License or out of the use or inability to use the</span>
+<span class="sd">      Work (including but not limited to damages for loss of goodwill,</span>
+<span class="sd">      work stoppage, computer failure or malfunction, or any and all</span>
+<span class="sd">      other commercial damages or losses), even if such Contributor</span>
+<span class="sd">      has been advised of the possibility of such damages.</span>
+
+<span class="sd">   9. Accepting Warranty or Additional Liability. While redistributing</span>
+<span class="sd">      the Work or Derivative Works thereof, You may choose to offer,</span>
+<span class="sd">      and charge a fee for, acceptance of support, warranty, indemnity,</span>
+<span class="sd">      or other liability obligations and/or rights consistent with this</span>
+<span class="sd">      License. However, in accepting such obligations, You may act only</span>
+<span class="sd">      on Your own behalf and on Your sole responsibility, not on behalf</span>
+<span class="sd">      of any other Contributor, and only if You agree to indemnify,</span>
+<span class="sd">      defend, and hold each Contributor harmless for any liability</span>
+<span class="sd">      incurred by, or claims asserted against, such Contributor by reason</span>
+<span class="sd">      of your accepting any such warranty or additional liability.</span>
+
+<span class="sd">   END OF TERMS AND CONDITIONS</span>
+
+<span class="sd">   APPENDIX: How to apply the Apache License to your work.</span>
+
+<span class="sd">      To apply the Apache License to your work, attach the following</span>
+<span class="sd">      boilerplate notice, with the fields enclosed by brackets &quot;{}&quot;</span>
+<span class="sd">      replaced with your own identifying information. (Don&#39;t include</span>
+<span class="sd">      the brackets!)  The text should be enclosed in the appropriate</span>
+<span class="sd">      comment syntax for the file format. We also recommend that a</span>
+<span class="sd">      file or class name and description of purpose be included on the</span>
+<span class="sd">      same &quot;printed page&quot; as the copyright notice for easier</span>
+<span class="sd">      identification within third-party archives.</span>
+
+<span class="sd">   Copyright {yyyy} {name of copyright owner}</span>
+
+<span class="sd">   Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="sd">   you may not use this file except in compliance with the License.</span>
+<span class="sd">   You may obtain a copy of the License at</span>
+
+<span class="sd">       http://www.apache.org/licenses/LICENSE-2.0</span>
+
+<span class="sd">   Unless required by applicable law or agreed to in writing, software</span>
+<span class="sd">   distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="sd">   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="sd">   See the License for the specific language governing permissions and</span>
+<span class="sd">   limitations under the License.</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de, Sam Murphy </span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">ee</span>
+
+
+<div class="viewcode-block" id="rescale"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.cloud_masking.rescale">[docs]</a><span class="k">def</span> <span class="nf">rescale</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">thresholds</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Linear stretch of image between two threshold values.</span>
+<span class="sd">    Taken from</span>
+<span class="sd">    https://github.com/samsammurphy/cloud-masking-sentinel2/blob/master/cloud-masking-sentinel2.ipynb</span>
+<span class="sd">    Availabe under Apache 2.0 licence</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    img : gee.image.Image</span>
+<span class="sd">        Image the stretch should be apploed two</span>
+<span class="sd">    thresholds : List</span>
+<span class="sd">        list with two elemts specifying upper and lower bound for stretching</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    img : gee.image.Image</span>
+<span class="sd">        stretched image</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">img</span><span class="o">.</span><span class="n">subtract</span><span class="p">(</span><span class="n">thresholds</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span><span class="n">thresholds</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">thresholds</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="sentinelCloudScore"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.cloud_masking.sentinelCloudScore">[docs]</a><span class="k">def</span> <span class="nf">sentinelCloudScore</span><span class="p">(</span><span class="n">img</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Computes spectral indices of cloudyness and takes the minimum of them.</span>
+<span class="sd">    </span>
+<span class="sd">    Each spectral index is fairly lenient because the group minimum </span>
+<span class="sd">    is a somewhat stringent comparison policy.</span>
+<span class="sd">    side note -&gt; this seems like a job for machine learning :)</span>
+<span class="sd">    </span>
+<span class="sd">    originally written by Matt Hancher for Landsat imagery</span>
+<span class="sd">    adapted to Sentinel by Chris Hewig and Ian Housman</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    img : gee.image.Image</span>
+<span class="sd">        Sentinel-2 Image for which the cloud mask should be calculated</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    img : gee.image.Image</span>
+<span class="sd">        Sentinel-2 image with cloud score as extra band</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># cloud until proven otherwise</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># clouds are reasonably bright</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">score</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">rescale</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s1">&#39;blue&#39;</span><span class="p">]),</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">score</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">rescale</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s1">&#39;aerosol&#39;</span><span class="p">]),</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">]))</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">score</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">rescale</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s1">&#39;aerosol&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s1">&#39;cirrus&#39;</span><span class="p">])),</span> <span class="p">[</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]))</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">score</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">rescale</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s1">&#39;red&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s1">&#39;green&#39;</span><span class="p">]))</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;blue&#39;</span><span class="p">)),</span> <span class="p">[</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">]))</span>
+    <span class="c1"># clouds are moist</span>
+    <span class="n">ndmi</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;red4&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">])</span>
+    <span class="n">score</span><span class="o">=</span><span class="n">score</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">rescale</span><span class="p">(</span><span class="n">ndmi</span><span class="p">,</span> <span class="p">[</span><span class="o">-</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">]))</span>
+    <span class="c1"># clouds are not snow (use Normalized Differential Snow Index)</span>
+    <span class="n">ndsi</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;swir1&#39;</span><span class="p">])</span>
+    <span class="n">score</span><span class="o">=</span><span class="n">score</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">rescale</span><span class="p">(</span><span class="n">ndsi</span><span class="p">,</span> <span class="p">[</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">]))</span><span class="o">.</span><span class="n">rename</span><span class="p">([</span><span class="s1">&#39;cloudScore&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">img</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">score</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ESAcloudMask"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.cloud_masking.ESAcloudMask">[docs]</a><span class="k">def</span> <span class="nf">ESAcloudMask</span><span class="p">(</span><span class="n">img</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    European Space Agency (ESA) clouds from &#39;QA60&#39;, i.e. Quality Assessment band at 60m</span>
+
+<span class="sd">    parsed by Nick Clinton</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    img : gee.image.Image</span>
+<span class="sd">        Sentinel-2 Image for which the cloud mask should be calculated</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    img : gee.image.Image</span>
+<span class="sd">        Sentinel-2 image with cloud score as extra band</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">qa</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;QA60&#39;</span><span class="p">)</span>
+    <span class="c1"># bits 10 and 11 are clouds and cirrus</span>
+    <span class="n">cloudBitMask</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">cirrusBitMask</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">11</span><span class="p">)</span>
+    <span class="c1"># both flags set to zero indicates clear conditions.</span>
+    <span class="n">clear</span> <span class="o">=</span> <span class="n">qa</span><span class="o">.</span><span class="n">bitwiseAnd</span><span class="p">(</span><span class="n">cloudBitMask</span><span class="p">)</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">And</span><span class="p">(</span>\
+           <span class="n">qa</span><span class="o">.</span><span class="n">bitwiseAnd</span><span class="p">(</span><span class="n">cirrusBitMask</span><span class="p">)</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+    <span class="c1"># clouds is not clear</span>
+    <span class="n">cloud</span> <span class="o">=</span> <span class="n">clear</span><span class="o">.</span><span class="n">Not</span><span class="p">()</span><span class="o">.</span><span class="n">rename</span><span class="p">([</span><span class="s1">&#39;ESA_clouds&#39;</span><span class="p">])</span>
+    <span class="c1"># return the masked and scaled data.</span>
+    <span class="k">return</span> <span class="n">img</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">cloud</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="shadowMask"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.cloud_masking.shadowMask">[docs]</a><span class="k">def</span> <span class="nf">shadowMask</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">cloudMaskType</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Finds cloud shadows in images</span>
+<span class="sd">    Originally by Gennadii Donchyts, adapted by Ian Housman</span>
+<span class="sd">    NOTE: the cloud mask must have been computed and added as separate</span>
+<span class="sd">    band to the Sentinel-2 imagery</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># auxiliary function</span>
+    <span class="k">def</span> <span class="nf">_potentialShadow</span><span class="p">(</span><span class="n">cloudHeight</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Finds potential shadow areas from array of cloud heights</span>
+<span class="sd">        </span>
+<span class="sd">        returns an image stack (i.e. list of images) </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cloudHeight</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Number</span><span class="p">(</span><span class="n">cloudHeight</span><span class="p">)</span>
+        
+        <span class="c1"># shadow vector length</span>
+        <span class="n">shadowVector</span> <span class="o">=</span> <span class="n">zenith</span><span class="o">.</span><span class="n">tan</span><span class="p">()</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">cloudHeight</span><span class="p">)</span>
+        
+        <span class="c1"># x and y components of shadow vector length</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">azimuth</span><span class="o">.</span><span class="n">cos</span><span class="p">()</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">shadowVector</span><span class="p">)</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span><span class="n">nominalScale</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">()</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">azimuth</span><span class="o">.</span><span class="n">sin</span><span class="p">()</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">shadowVector</span><span class="p">)</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span><span class="n">nominalScale</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">()</span>
+        
+        <span class="c1"># affine translation of clouds</span>
+        <span class="n">cloudShift</span> <span class="o">=</span> <span class="n">cloudMask</span><span class="o">.</span><span class="n">changeProj</span><span class="p">(</span><span class="n">cloudMask</span><span class="o">.</span><span class="n">projection</span><span class="p">(),</span> <span class="n">cloudMask</span><span class="o">.</span><span class="n">projection</span><span class="p">()</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span> <span class="c1"># could incorporate shadow stretch?</span>
+        
+        <span class="k">return</span> <span class="n">cloudShift</span>
+  
+    <span class="c1"># select a cloud mask</span>
+    <span class="n">cloudMask</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">cloudMaskType</span><span class="p">)</span>
+    
+    <span class="c1"># make sure it is binary (i.e. apply threshold to cloud score)</span>
+    <span class="n">cloudScoreThreshold</span> <span class="o">=</span> <span class="mf">0.5</span>
+    <span class="n">cloudMask</span> <span class="o">=</span> <span class="n">cloudMask</span><span class="o">.</span><span class="n">gt</span><span class="p">(</span><span class="n">cloudScoreThreshold</span><span class="p">)</span>
+
+    <span class="c1"># solar geometry (radians)</span>
+    <span class="n">azimuth</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Number</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;solar_azimuth&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span><span class="mf">180.0</span><span class="p">)</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">ee</span><span class="o">.</span><span class="n">Number</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">))</span>
+    <span class="n">zenith</span>  <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Number</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span> <span class="p">)</span><span class="o">.</span><span class="n">subtract</span><span class="p">(</span><span class="n">ee</span><span class="o">.</span><span class="n">Number</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;solar_zenith&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span><span class="mf">180.0</span><span class="p">))</span>
+
+    <span class="c1"># find potential shadow areas based on cloud and solar geometry</span>
+    <span class="n">nominalScale</span> <span class="o">=</span> <span class="n">cloudMask</span><span class="o">.</span><span class="n">projection</span><span class="p">()</span><span class="o">.</span><span class="n">nominalScale</span><span class="p">()</span>
+    <span class="n">cloudHeights</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">List</span><span class="o">.</span><span class="n">sequence</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span><span class="mi">4000</span><span class="p">,</span><span class="mi">500</span><span class="p">)</span>        
+    <span class="n">potentialShadowStack</span> <span class="o">=</span> <span class="n">cloudHeights</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">_potentialShadow</span><span class="p">)</span>
+    <span class="n">potentialShadow</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">ImageCollection</span><span class="o">.</span><span class="n">fromImages</span><span class="p">(</span><span class="n">potentialShadowStack</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+    <span class="c1"># shadows are not clouds</span>
+    <span class="n">potentialShadow</span> <span class="o">=</span> <span class="n">potentialShadow</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">cloudMask</span><span class="o">.</span><span class="n">Not</span><span class="p">())</span>
+
+    <span class="c1"># (modified) dark pixel detection </span>
+    <span class="n">darkPixels</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">normalizedDifference</span><span class="p">([</span><span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;swir2&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">gt</span><span class="p">(</span><span class="mf">0.25</span><span class="p">)</span>
+
+    <span class="c1"># shadows are dark</span>
+    <span class="n">shadows</span> <span class="o">=</span> <span class="n">potentialShadow</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">darkPixels</span><span class="p">)</span><span class="o">.</span><span class="n">rename</span><span class="p">([</span><span class="s1">&#39;shadows&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># might be scope for one last check here. Dark surfaces (e.g. water, basalt, etc.) cause shadow commission errors.</span>
+    <span class="c1"># perhaps using a NDWI (e.g. green and nir)</span>
+    <span class="k">return</span> <span class="n">img</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">shadows</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="mask_clouds"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.cloud_masking.mask_clouds">[docs]</a><span class="k">def</span> <span class="nf">mask_clouds</span><span class="p">(</span><span class="n">s2_image</span><span class="p">,</span> <span class="n">option</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    this function masks out clouds from Sentinel-2 TOA imagery using the</span>
+<span class="sd">    quality information provided by the ESA-internal pre-processing chain</span>
+<span class="sd">    (Level 1C).</span>
+<span class="sd">    Quality flag bits 10 and 11 (clouds and cirrus, respectively) are masked</span>
+<span class="sd">    out. Of course, this is only a very rough cloud correction approach</span>
+<span class="sd">    as shadowing effects are disregarded.</span>
+<span class="sd">    Therefore, users might come up with a more sophisticated soluation for</span>
+<span class="sd">    their own processing workflow</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    s2_image : ee.image.Image</span>
+<span class="sd">        Sentinel-2 imagery (from GEE) to be masked for clouds and cirrus</span>
+<span class="sd">    option : Integer</span>
+<span class="sd">        two options (1 and 2) are available for cloud masking</span>
+<span class="sd">        1 = use ESA quality information</span>
+<span class="sd">        2 = use Matt Hancher for Landsat imagery adapted to Sentinel by </span>
+<span class="sd">        Chris Hewig and Ian Housman</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    s2_masked : ee.image.Image</span>
+<span class="sd">        Sentinel-2 imagery with masked clouds and cirrus (if any)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ee</span><span class="o">.</span><span class="n">Initialize</span><span class="p">()</span>
+    <span class="c1"># convert to top-of-atmosphere reflectance</span>
+    <span class="c1"># top of atmosphere reflectance</span>
+    <span class="n">toa</span> <span class="o">=</span> <span class="n">s2_image</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s1">&#39;B1&#39;</span><span class="p">,</span><span class="s1">&#39;B2&#39;</span><span class="p">,</span><span class="s1">&#39;B3&#39;</span><span class="p">,</span><span class="s1">&#39;B4&#39;</span><span class="p">,</span><span class="s1">&#39;B5&#39;</span><span class="p">,</span><span class="s1">&#39;B6&#39;</span><span class="p">,</span><span class="s1">&#39;B7&#39;</span><span class="p">,</span><span class="s1">&#39;B8A&#39;</span><span class="p">,</span><span class="s1">&#39;B9&#39;</span><span class="p">,</span><span class="s1">&#39;B10&#39;</span><span class="p">,</span> <span class="s1">&#39;B11&#39;</span><span class="p">,</span><span class="s1">&#39;B12&#39;</span><span class="p">],</span>\
+                 <span class="p">[</span><span class="s1">&#39;aerosol&#39;</span><span class="p">,</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="s1">&#39;B5&#39;</span><span class="p">,</span> <span class="s1">&#39;red2&#39;</span><span class="p">,</span> <span class="s1">&#39;B7&#39;</span><span class="p">,</span> <span class="s1">&#39;red4&#39;</span><span class="p">,</span><span class="s1">&#39;h2o&#39;</span><span class="p">,</span> <span class="s1">&#39;cirrus&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">,</span> <span class="s1">&#39;swir2&#39;</span><span class="p">])</span>\
+                 <span class="o">.</span><span class="n">divide</span><span class="p">(</span><span class="mi">10000</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">s2_image</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;QA60&#39;</span><span class="p">))</span>\
+                 <span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;solar_azimuth&#39;</span><span class="p">,</span><span class="n">s2_image</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;MEAN_SOLAR_AZIMUTH_ANGLE&#39;</span><span class="p">))</span>\
+                 <span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;solar_zenith&#39;</span><span class="p">,</span><span class="n">s2_image</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;MEAN_SOLAR_ZENITH_ANGLE&#39;</span><span class="p">))</span>
+    <span class="c1"># which option should be used for the cloud masking</span>
+    <span class="c1"># clouds and cloud shadows</span>
+
+    <span class="k">if</span> <span class="n">option</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">toa</span> <span class="o">=</span> <span class="n">ESAcloudMask</span><span class="p">(</span><span class="n">toa</span><span class="p">)</span>
+        <span class="n">toa</span> <span class="o">=</span> <span class="n">shadowMask</span><span class="p">(</span><span class="n">toa</span><span class="p">,</span><span class="s1">&#39;ESA_clouds&#39;</span><span class="p">)</span>
+        <span class="c1"># reformat the output</span>
+        <span class="n">toa</span> <span class="o">=</span> <span class="n">toa</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+            <span class="p">[</span><span class="s1">&#39;aerosol&#39;</span><span class="p">,</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="s1">&#39;B5&#39;</span><span class="p">,</span> <span class="s1">&#39;red2&#39;</span><span class="p">,</span> <span class="s1">&#39;B7&#39;</span><span class="p">,</span> <span class="s1">&#39;red4&#39;</span><span class="p">,</span><span class="s1">&#39;h2o&#39;</span><span class="p">,</span> <span class="s1">&#39;cirrus&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">,</span> <span class="s1">&#39;swir2&#39;</span><span class="p">,</span><span class="s1">&#39;ESA_clouds&#39;</span><span class="p">,</span> <span class="s1">&#39;shadows&#39;</span><span class="p">],</span>
+    <span class="p">[</span><span class="s1">&#39;B1&#39;</span><span class="p">,</span><span class="s1">&#39;B2&#39;</span><span class="p">,</span><span class="s1">&#39;B3&#39;</span><span class="p">,</span><span class="s1">&#39;B4&#39;</span><span class="p">,</span><span class="s1">&#39;B5&#39;</span><span class="p">,</span><span class="s1">&#39;B6&#39;</span><span class="p">,</span><span class="s1">&#39;B7&#39;</span><span class="p">,</span><span class="s1">&#39;B8A&#39;</span><span class="p">,</span><span class="s1">&#39;B9&#39;</span><span class="p">,</span><span class="s1">&#39;B10&#39;</span><span class="p">,</span> <span class="s1">&#39;B11&#39;</span><span class="p">,</span><span class="s1">&#39;B12&#39;</span><span class="p">,</span><span class="s1">&#39;CloudMask&#39;</span><span class="p">,</span><span class="s1">&#39;ShadowMask&#39;</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="n">option</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">toa</span> <span class="o">=</span> <span class="n">sentinelCloudScore</span><span class="p">(</span><span class="n">toa</span><span class="p">)</span>
+        <span class="n">toa</span> <span class="o">=</span> <span class="n">shadowMask</span><span class="p">(</span><span class="n">toa</span><span class="p">,</span><span class="s1">&#39;cloudScore&#39;</span><span class="p">)</span>
+        <span class="n">toa</span> <span class="o">=</span> <span class="n">toa</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+            <span class="p">[</span><span class="s1">&#39;aerosol&#39;</span><span class="p">,</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="s1">&#39;B5&#39;</span><span class="p">,</span> <span class="s1">&#39;red2&#39;</span><span class="p">,</span> <span class="s1">&#39;B7&#39;</span><span class="p">,</span> <span class="s1">&#39;red4&#39;</span><span class="p">,</span><span class="s1">&#39;h2o&#39;</span><span class="p">,</span> <span class="s1">&#39;cirrus&#39;</span><span class="p">,</span><span class="s1">&#39;swir1&#39;</span><span class="p">,</span> <span class="s1">&#39;swir2&#39;</span><span class="p">,</span> <span class="s1">&#39;cloudScore&#39;</span><span class="p">,</span> <span class="s1">&#39;shadows&#39;</span><span class="p">],</span>
+    <span class="p">[</span><span class="s1">&#39;B1&#39;</span><span class="p">,</span><span class="s1">&#39;B2&#39;</span><span class="p">,</span><span class="s1">&#39;B3&#39;</span><span class="p">,</span><span class="s1">&#39;B4&#39;</span><span class="p">,</span><span class="s1">&#39;B5&#39;</span><span class="p">,</span><span class="s1">&#39;B6&#39;</span><span class="p">,</span><span class="s1">&#39;B7&#39;</span><span class="p">,</span><span class="s1">&#39;B8A&#39;</span><span class="p">,</span><span class="s1">&#39;B9&#39;</span><span class="p">,</span><span class="s1">&#39;B10&#39;</span><span class="p">,</span> <span class="s1">&#39;B11&#39;</span><span class="p">,</span><span class="s1">&#39;B12&#39;</span><span class="p">,</span><span class="s1">&#39;CloudMask&#39;</span><span class="p">,</span><span class="s1">&#39;ShadowMask&#39;</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="bp">NotImplemented</span>
+
+    <span class="k">return</span> <span class="n">toa</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

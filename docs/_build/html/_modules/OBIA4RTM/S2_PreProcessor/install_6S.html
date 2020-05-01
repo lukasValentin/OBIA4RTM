@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.S2_PreProcessor.install_6S &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.S2_PreProcessor.install_6S</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Fri Jul 26 15:42:10 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">wget</span>
+<span class="kn">import</span> <span class="nn">tarfile</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">from</span> <span class="nn">urllib.error</span> <span class="kn">import</span> <span class="n">HTTPError</span>
+<span class="kn">import</span> <span class="nn">Py6S</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+
+
+<div class="viewcode-block" id="install_6S"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.install_6S.install_6S">[docs]</a><span class="k">def</span> <span class="nf">install_6S</span><span class="p">(</span><span class="n">link</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    installs the 6S algorithm required for atmospheric correction from</span>
+<span class="sd">    the Fortran source code using gfortran.</span>
+<span class="sd">    The sources will be installed to the OBIA4RTM install dir</span>
+<span class="sd">    (somewhere in the user profile) where also the config files are stored.</span>
+
+<span class="sd">    Currently, only Linux/ Unix systems are supported for this operation.</span>
+
+<span class="sd">    In case you expire any problems automatically downloading and building</span>
+<span class="sd">    6S, please also consult: https://py6s.readthedocs.io/en/latest/installation.html</span>
+
+<span class="sd">    Windows-Users please note that the installation might not be that smoothly</span>
+<span class="sd">    as on Posix, as you will have to install a bunch of additional functionalities</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># first, find out where OBIA4RTM has been installed to</span>
+    <span class="n">obia4rtm_home</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Trying to download and install 6S from Fortran source!&#39;</span><span class="p">)</span>
+    <span class="c1"># read in the OBIA4RTM_HOME file to get the installation directory</span>
+    <span class="c1"># the user has access to</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">obia4rtm_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;OBIA4RTM_HOME&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">data</span><span class="p">:</span>
+        <span class="n">install_dir</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+    <span class="c1"># now try to setup a directory 6S can be installed to</span>
+    <span class="n">six6_dir</span> <span class="o">=</span> <span class="n">install_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;sixS&#39;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">six6_dir</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">FileExistsError</span><span class="p">,</span> <span class="ne">PermissionError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to create directory for installing 6S!</span><span class="se">\n</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">err</span><span class="p">))</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># change to the installation directory for 6S</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">six6_dir</span><span class="p">)</span>
+    <span class="c1"># try to setup a source and build directory</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="s1">&#39;src&#39;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileExistsError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to create directory for installing 6S!</span><span class="se">\n</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">err</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Setup installation into </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">six6_dir</span><span class="p">))</span>
+    <span class="c1"># now the 6S source code can be downloaded (link last tested on 26th Jul 2019)</span>
+    <span class="c1"># if this link is not working any longer, you can provide an alternative link</span>
+    <span class="c1"># in the function call interface</span>
+    <span class="c1"># before downloading, change to the src directory</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="s1">&#39;src&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">link</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">link</span> <span class="o">=</span> <span class="s2">&quot;http://rtwilson.com/downloads/6SV-1.1.tar&quot;</span>
+    <span class="c1"># use wget to download the Fortran source code as tar file</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sixS_tar</span> <span class="o">=</span> <span class="n">wget</span><span class="o">.</span><span class="n">download</span><span class="p">(</span><span class="n">link</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">HTTPError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The link address &#39;</span><span class="si">{}</span><span class="s2">&#39; for downloading the 6S tar-ball seems not be valid!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">link</span><span class="p">))</span>
+    <span class="c1"># try to unpack the tarball</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">tf</span> <span class="o">=</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">sixS_tar</span><span class="p">)</span>
+        <span class="n">tf</span><span class="o">.</span><span class="n">extractall</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">TarError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The tar-file &#39;</span><span class="si">{}</span><span class="s2">&#39; seems to be corrupt and cannot be unpacked!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">sixS_tar</span><span class="p">))</span>
+    <span class="c1"># after that a directory called 6SV1.1 should be created -&gt; go into it</span>
+    <span class="n">sixS_dir</span> <span class="o">=</span> <span class="s1">&#39;6SV1.1&#39;</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">sixS_dir</span><span class="p">)</span>
+<span class="c1"># =============================================================================</span>
+<span class="c1">#     # now, the makefile must be altered to set the correct compiler option</span>
+<span class="c1">#     # determine the OS as there are different ways to go for Win and posix</span>
+    <span class="n">platform</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;Makefile&#39;</span><span class="p">,</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">makefile</span><span class="p">:</span>
+             <span class="n">lines</span> <span class="o">=</span> <span class="n">makefile</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;nt&#39;</span><span class="p">:</span>
+         <span class="c1"># Windows</span>
+         <span class="c1"># iterate over the lines to determine and alter the FC flag</span>
+         <span class="n">line_number</span> <span class="o">=</span> <span class="mi">0</span>
+         <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+             <span class="n">line_number</span> <span class="o">+=</span> <span class="mi">1</span>
+             <span class="k">if</span> <span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;-lm&#39;</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+                 <span class="k">break</span>
+         <span class="c1"># keep the previuos and following lines and only alter the &#39;FC&#39; line</span>
+         <span class="n">prev_lines</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">line_number</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+         <span class="n">foll_lines</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">line_number</span><span class="p">::]</span>
+         <span class="c1"># according to https://py6s.readthedocs.io/en/latest/installation.html</span>
+         <span class="c1"># the -lm option must be deleted</span>
+         <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-lm&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+         <span class="c1"># Linux and Mac OS X</span>
+         <span class="c1"># this option will ONLY work under Linux, Unix and OS X given that</span>
+         <span class="c1"># gfortran is available</span>
+        <span class="c1"># iterate over the lines to determine and alter the FC flag</span>
+         <span class="n">line_number</span> <span class="o">=</span> <span class="mi">0</span>
+         <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+             <span class="n">line_number</span> <span class="o">+=</span> <span class="mi">1</span>
+             <span class="k">if</span> <span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;FC&#39;</span><span class="p">)):</span>
+                 <span class="k">break</span>
+         <span class="c1"># keep the previuos and following lines and only alter the &#39;FC&#39; line</span>
+         <span class="n">prev_lines</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">line_number</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+         <span class="n">foll_lines</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">line_number</span><span class="p">::]</span>
+         <span class="c1"># instead of the old argument of the &#39;FC&#39;, this expression is required</span>
+         <span class="c1"># according to https://py6s.readthedocs.io/en/latest/installation.html</span>
+         <span class="n">line</span> <span class="o">=</span> <span class="s1">&#39;FC      = gfortran -std=legacy -ffixed-line-length-none -ffpe-summary=none $(FFLAGS)</span><span class="se">\n</span><span class="s1">&#39;</span>
+    <span class="c1"># delete the old Makefile</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;Makefile&#39;</span><span class="p">)</span>
+    <span class="c1"># no write to the new makefile</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;Makefile&#39;</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">makefile</span><span class="p">:</span>
+        <span class="n">makefile</span><span class="o">.</span><span class="n">writelines</span><span class="p">(</span><span class="n">prev_lines</span><span class="p">)</span>
+        <span class="n">makefile</span><span class="o">.</span><span class="n">writelines</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+        <span class="n">makefile</span><span class="o">.</span><span class="n">writelines</span><span class="p">(</span><span class="n">foll_lines</span><span class="p">)</span>
+<span class="c1"># =============================================================================</span>
+    <span class="c1"># run the make file (NOTE: make mus be installed on Win seperately!)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Running make to build the executable&#39;</span><span class="p">)</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s1">&#39;make&#39;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Make failed!</span><span class="se">\n</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">err</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Make run successfully completed- Trying to setup symbolic link to 6S binary&#39;</span><span class="p">)</span>
+    <span class="c1"># finally, create a symbolic link to ensure that the binary can be assessed</span>
+    <span class="c1"># again, distinguish between Win and Posix</span>
+    <span class="k">if</span> <span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;nt&#39;</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s1">&#39;MKLINK sixsV1.1.exe C:\Windows\System&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s1">&#39;ln sixsV1.1 /usr/local/bin/sixs&#39;</span><span class="p">)</span>
+    <span class="c1"># finished</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** 6S source code successfully downloaded, unpacked and built!&#39;</span><span class="p">)</span>
+    <span class="c1"># testing</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Running test if 6S Python-Wrapper (Py6S) is working. Output:</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">Py6S</span><span class="o">.</span><span class="n">SixS</span><span class="o">.</span><span class="n">test</span><span class="p">()</span></div>
+
+
+<span class="c1"># make the function executable when the module is called from the command line</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">install_6S</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,733 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.inversion.inversion &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.inversion.inversion</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Sat Mar  9 10:34:57 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">prosail</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">DatabaseError</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM.configurations.connect_db</span> <span class="k">as</span> <span class="nn">connect_db</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM.inversion.lookup_table</span> <span class="k">as</span> <span class="nn">lut</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.inversion.handle_metadata</span> <span class="kn">import</span> <span class="n">get_resampler</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.inversion.handle_prosail_cfg</span> <span class="kn">import</span> <span class="n">read_params_per_class</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.logger</span> <span class="kn">import</span> <span class="n">get_logger</span><span class="p">,</span> <span class="n">close_logger</span>
+
+
+<span class="n">error_message</span> <span class="o">=</span> <span class="s1">&#39;An error occured during the inversion process. Check log.&#39;</span>
+
+
+<div class="viewcode-block" id="inversion"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion">[docs]</a><span class="k">class</span> <span class="nc">inversion</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    super-class for the object-based inversion of satellite scenes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        class constructor for the inversion class</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        scene_id : String</span>
+<span class="sd">            ID of the scene to be inverted -&gt; links to the metadata</span>
+<span class="sd">            stored in the OBIA4RTM database</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span> <span class="o">=</span> <span class="n">scene_id</span>
+        <span class="c1"># get a logger</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__sensor</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__scene_id</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_time</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_date</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="c1"># angles</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__tts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__tto</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__psi</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="c1"># setup the DB connection</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="n">connect_db</span><span class="o">.</span><span class="n">connect_db</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Connected to PostgreSQL engine sucessfully!&#39;</span><span class="p">)</span>
+        <span class="c1"># determine the directory the configuration files are located</span>
+        <span class="n">obia4rtm_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+        <span class="n">fname</span> <span class="o">=</span> <span class="n">obia4rtm_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;OBIA4RTM_HOME&#39;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">data</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__directory</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+    <span class="c1"># end __init__</span>
+
+
+<div class="viewcode-block" id="inversion.set_ProSAIL_config"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion.set_ProSAIL_config">[docs]</a>    <span class="k">def</span> <span class="nf">set_ProSAIL_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path_to_config</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        read in the config file holding the vegetation parameters for</span>
+<span class="sd">        setting up the lookup table using the ProSAIL radiative transfer</span>
+<span class="sd">        model</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path_to_config : String</span>
+<span class="sd">            optinal, path and filename of config-file for ProSAIL</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        path_to_config : String</span>
+<span class="sd">            definite location of the config file or error if file not found</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># in case path_to_config is None use the default location in the root</span>
+        <span class="c1"># of OBIA4RTM (prosail.cfg)</span>
+        <span class="k">if</span> <span class="n">path_to_config</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">path_to_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__directory</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;prosail.txt&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path_to_config</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Unable to locate the config file for PROSAIL!&quot;</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+        <span class="c1"># endif</span>
+        <span class="k">return</span> <span class="n">path_to_config</span></div>
+    <span class="c1"># end set_ProSAIL_config</span>
+
+
+<div class="viewcode-block" id="inversion.set_landcover_config"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion.set_landcover_config">[docs]</a>    <span class="k">def</span> <span class="nf">set_landcover_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path_to_lc_config</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        read in the land cover config file holding the land cover classes for</span>
+<span class="sd">        setting up the lookup table using the ProSAIL radiative transfer</span>
+<span class="sd">        model</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path_to_lc_config : String</span>
+<span class="sd">            optinal, path and filename of config-file for land cover classes</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        path_to_config : String</span>
+<span class="sd">            definite location of the config file or error if file not found</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># in case path_to_config is None use the default location in the root</span>
+        <span class="c1"># of OBIA4RTM (prosail.cfg)</span>
+        <span class="k">if</span> <span class="n">path_to_lc_config</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">path_to_lc_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__directory</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;landcover.cfg&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path_to_lc_config</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Unable to locate the config file for land cover classes!&quot;</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+        <span class="c1"># endif</span>
+        <span class="k">return</span> <span class="n">path_to_lc_config</span></div>
+    <span class="c1"># end set_ProSAIL_config</span>
+
+
+<div class="viewcode-block" id="inversion.set_soilrefl"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion.set_soilrefl">[docs]</a>    <span class="k">def</span> <span class="nf">set_soilrefl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path_to_soilrefl_file</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        set up the file-path to the txt file containing</span>
+<span class="sd">        the soil-reflectance required for ProSAIL to account for</span>
+<span class="sd">        the soil background and read in the values</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path_to_soilrefl_file : String</span>
+<span class="sd">            optional, file to the txt file with soil reflectance values</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        soils : Numpy Array</span>
+<span class="sd">            array of soil reflectance values (1 nm steps)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">path_to_soilrefl_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">path_to_soilrefl_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__directory</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;soil_reflectance.txt&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path_to_soilrefl_file</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Unable to locate the soil_reflectance.txt file!&quot;</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+        <span class="n">soils</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">path_to_soilrefl_file</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">soils</span></div>
+    <span class="c1"># end set_soilrefl_file</span>
+
+
+<div class="viewcode-block" id="inversion.get_scene_metadata"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion.get_scene_metadata">[docs]</a>    <span class="k">def</span> <span class="nf">get_scene_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        queries the relevant scene metadata from the database</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># check if cursor is closed -&gt; if closed, reconnect to database</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">closed</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span> <span class="o">=</span> <span class="n">connect_db</span><span class="o">.</span><span class="n">connect_db</span><span class="p">()</span>
+        <span class="c1"># database query</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT  acquisition_time, &quot;</span>\
+            <span class="s2">&quot;scene_id, sun_zenith, obs_zenith, rel_azimuth, sensor &quot;</span>\
+            <span class="s2">&quot;FROM public.scene_metadata WHERE scene_id = &#39;</span><span class="si">{}</span><span class="s2">&#39;;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="n">DatabaseError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Querying scene meta for scene &#39;</span><span class="si">{}</span><span class="s2">&#39; failed&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+        <span class="c1"># make sure that res is not empty</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not find metadata for scene &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">))</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+        <span class="c1"># extract the desired information</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_time</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_date</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_time</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__tts</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__tto</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__psi</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__sensor</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="inversion.gen_lut"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion.gen_lut">[docs]</a>    <span class="k">def</span> <span class="nf">gen_lut</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inv_mapping_table</span><span class="p">,</span> <span class="n">inv_table</span><span class="p">,</span>
+                <span class="n">landcover_config_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prosail_config_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">soil_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates the lookup table and stores it in the DB</span>
+<span class="sd">        must be run seperately from the inversion part</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        inv_mapping_table : String</span>
+<span class="sd">            name of the table storing the inversion mapping required for</span>
+<span class="sd">            performing the inversion</span>
+<span class="sd">        inv_table : String</span>
+<span class="sd">            Name of the table the lookup-table should be written to</span>
+<span class="sd">            (&lt;schema.table&gt;)</span>
+<span class="sd">        landcover_config_path : String</span>
+<span class="sd">            file-path to landcover config file (opt.; per default the OBIA4RTM</span>
+<span class="sd">            delivered file will be used)</span>
+<span class="sd">        prosail_config_path : String</span>
+<span class="sd">            file-path to landcover config file (opt.; per default the OBIA4RTM</span>
+<span class="sd">            delivered file will be used)</span>
+<span class="sd">        soil_path : String</span>
+<span class="sd">            file-path to file with soil reflectance values (opt.; per default</span>
+<span class="sd">            the OBIA4RTM delivered file will be used)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        --------</span>
+<span class="sd">        None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># get scene metadata first</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_scene_metadata</span><span class="p">()</span>
+        <span class="c1"># basic setup first</span>
+        <span class="c1"># get S2 sensor-response function</span>
+        <span class="n">resampler</span> <span class="o">=</span> <span class="n">get_resampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="p">,</span>
+                                  <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="p">,</span>
+                                  <span class="bp">self</span><span class="o">.</span><span class="n">__sensor</span><span class="p">,</span>
+                                  <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+
+        <span class="c1"># params that could be inverted</span>
+        <span class="n">list_of_params</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n&#39;</span><span class="p">,</span> <span class="s1">&#39;cab&#39;</span><span class="p">,</span> <span class="s1">&#39;car&#39;</span><span class="p">,</span> <span class="s1">&#39;cbrown&#39;</span><span class="p">,</span> <span class="s1">&#39;cw&#39;</span><span class="p">,</span> <span class="s1">&#39;cm&#39;</span><span class="p">,</span> <span class="s1">&#39;lai&#39;</span><span class="p">,</span>
+                          <span class="s1">&#39;lidfa&#39;</span><span class="p">,</span> <span class="s1">&#39;lidfb&#39;</span><span class="p">,</span> <span class="s1">&#39;rsoil&#39;</span><span class="p">,</span> <span class="s1">&#39;psoil&#39;</span><span class="p">,</span> <span class="s1">&#39;hspot&#39;</span><span class="p">,</span>
+                          <span class="s1">&#39;typelidf&#39;</span><span class="p">]</span>
+        <span class="c1"># firstly, create the LUT from the params config file for the</span>
+        <span class="c1"># defined land cover classes</span>
+        <span class="k">if</span> <span class="n">prosail_config_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">prosail_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_ProSAIL_config</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">prosail_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_ProSAIL_config</span><span class="p">(</span><span class="n">prosail_config_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">landcover_config_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">landcover_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_landcover_config</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">landcover_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_landcover_config</span><span class="p">(</span><span class="n">landcover_config_path</span><span class="p">)</span>
+        <span class="c1"># default soil-spectra -&gt; use soil_reflectance from ProSAIL package</span>
+        <span class="k">if</span> <span class="n">soil_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">soils</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_soilrefl</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">soils</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_soilrefl</span><span class="p">(</span><span class="n">soil_path</span><span class="p">)</span>
+        <span class="c1"># read in the landcover class information and the corresponding</span>
+        <span class="c1"># prosail parameter setup</span>
+        <span class="n">params_container</span> <span class="o">=</span> <span class="n">read_params_per_class</span><span class="p">(</span><span class="n">prosail_config</span><span class="p">,</span>
+                                                 <span class="n">landcover_config</span><span class="p">,</span>
+                                                 <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+        <span class="c1"># extract the land cover classes</span>
+        <span class="n">lc_keys</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">params_container</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="c1"># loop over the land cover classes and generate the LUT per class</span>
+        <span class="k">for</span> <span class="n">lc</span> <span class="ow">in</span> <span class="n">lc_keys</span><span class="p">:</span>
+            <span class="c1"># extract the land cover code and semantics</span>
+            <span class="n">lc_code</span> <span class="o">=</span> <span class="n">lc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># code</span>
+            <span class="n">lc_sema</span> <span class="o">=</span> <span class="n">lc</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># meaning</span>
+            <span class="c1"># get the ProSAIL parameters</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="n">params_container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">lc</span><span class="p">)</span>
+            <span class="n">param_lut</span> <span class="o">=</span> <span class="n">lut</span><span class="o">.</span><span class="n">lookup_table</span><span class="p">()</span>
+            <span class="n">param_lut</span><span class="o">.</span><span class="n">generate_param_lut</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;INFO: Start to generate ProSAIL-LUT for class &#39;</span><span class="si">{0}</span><span class="s2">&#39; with &quot;</span>\
+                  <span class="s2">&quot;</span><span class="si">{1}</span><span class="s2"> simulations&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">lc_sema</span><span class="p">,</span>
+                    <span class="n">param_lut</span><span class="o">.</span><span class="n">lut_size</span><span class="p">))</span>
+            <span class="n">params_inv</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">param_lut</span><span class="o">.</span><span class="n">to_be_inv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="n">params_inv</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">ii</span><span class="p">)]</span> <span class="o">=</span> <span class="n">list_of_params</span><span class="p">[</span><span class="n">param_lut</span><span class="o">.</span><span class="n">to_be_inv</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">ii</span><span class="p">]]</span>
+            <span class="c1"># convert to json</span>
+            <span class="n">params_inv_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">params_inv</span><span class="p">)</span>
+            <span class="c1"># write the metadata into the inversion_mapping table</span>
+            <span class="n">insert</span> <span class="o">=</span> <span class="s2">&quot;INSERT INTO </span><span class="si">{0}</span><span class="s2"> (acquisition_date, &quot;</span> \
+                     <span class="s2">&quot;params_to_be_inverted, landuse, sensor, scene_id) &quot;</span> \
+                     <span class="s2">&quot;VALUES(&#39;</span><span class="si">{1}</span><span class="s2">&#39;, &#39;</span><span class="si">{2}</span><span class="s2">&#39;, </span><span class="si">{3}</span><span class="s2">, &#39;</span><span class="si">{4}</span><span class="s2">&#39;, &#39;</span><span class="si">{5}</span><span class="s2">&#39;) &quot;</span>\
+                     <span class="s2">&quot;ON CONFLICT(scene_id, landuse) DO NOTHING;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                             <span class="n">inv_mapping_table</span><span class="p">,</span>
+                             <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_date</span><span class="p">,</span>
+                             <span class="n">params_inv_json</span><span class="p">,</span>
+                             <span class="n">lc_code</span><span class="p">,</span>
+                             <span class="bp">self</span><span class="o">.</span><span class="n">__sensor</span><span class="p">,</span>
+                             <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">insert</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+            <span class="k">except</span> <span class="n">DatabaseError</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to insert metadata of inversion process!&quot;</span><span class="p">,</span>
+                                    <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+
+            <span class="c1"># loop over the parameters stored in the LUT and generate the </span>
+            <span class="c1"># according synthetic spectra</span>
+            <span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">param_lut</span><span class="o">.</span><span class="n">lut_size</span><span class="p">):</span>
+                
+                <span class="c1"># run ProSAIL for each combination in the LUT</span>
+                <span class="n">n</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">cab</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">car</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">cbrown</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">cw</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">cm</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">lai</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">6</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">lidfa</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">7</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">lidfb</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">rsoil</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">9</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">psoil</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">hspot</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">11</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                <span class="n">typelidf</span> <span class="o">=</span> <span class="n">param_lut</span><span class="o">.</span><span class="n">lut</span><span class="p">[</span><span class="mi">12</span><span class="p">,</span><span class="n">ii</span><span class="p">]</span>
+                
+                <span class="c1"># run prosail in forward mode -&gt; resulting spectrum is from </span>
+                <span class="c1"># 400 to 2500 nm in 1nm steps</span>
+                <span class="c1"># use Python ProSAIL bindings</span>
+                <span class="n">spectrum</span> <span class="o">=</span> <span class="n">prosail</span><span class="o">.</span><span class="n">run_prosail</span><span class="p">(</span><span class="n">n</span><span class="p">,</span>
+                                               <span class="n">cab</span><span class="p">,</span>
+                                               <span class="n">car</span><span class="p">,</span>
+                                               <span class="n">cbrown</span><span class="p">,</span>
+                                               <span class="n">cw</span><span class="p">,</span>
+                                               <span class="n">cm</span><span class="p">,</span>
+                                               <span class="n">lai</span><span class="p">,</span>
+                                               <span class="n">lidfa</span><span class="p">,</span>
+                                               <span class="n">hspot</span><span class="p">,</span>
+                                               <span class="bp">self</span><span class="o">.</span><span class="n">__tts</span><span class="p">,</span>
+                                               <span class="bp">self</span><span class="o">.</span><span class="n">__tto</span><span class="p">,</span>
+                                               <span class="bp">self</span><span class="o">.</span><span class="n">__psi</span><span class="p">,</span>
+                                               <span class="n">ant</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+                                               <span class="n">alpha</span><span class="o">=</span><span class="mf">40.</span><span class="p">,</span>
+                                               <span class="n">prospect_version</span><span class="o">=</span><span class="s2">&quot;5&quot;</span><span class="p">,</span> 
+                                               <span class="n">typelidf</span><span class="o">=</span><span class="n">typelidf</span><span class="p">,</span>
+                                               <span class="n">lidfb</span><span class="o">=</span><span class="n">lidfb</span><span class="p">,</span>
+                                               <span class="n">rsoil0</span><span class="o">=</span><span class="n">soils</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span>
+                                               <span class="n">rsoil</span><span class="o">=</span><span class="n">rsoil</span><span class="p">,</span>
+                                               <span class="n">psoil</span><span class="o">=</span><span class="n">psoil</span><span class="p">,</span>
+                                               <span class="n">factor</span><span class="o">=</span><span class="s2">&quot;SDR&quot;</span><span class="p">)</span>
+                <span class="c1"># resample to SRF of sensor</span>
+                <span class="c1"># perform resampling from 1nm to S2-bands</span>
+                <span class="n">sensor_spectrum</span> <span class="o">=</span> <span class="n">resampler</span><span class="p">(</span><span class="n">spectrum</span><span class="p">)</span>
+
+                <span class="c1"># convert to % reflectance</span>
+                <span class="n">sensor_spectrum</span> <span class="o">*=</span> <span class="mf">100.</span>
+
+                <span class="c1"># store the results in DB</span>
+                <span class="n">insert_statement</span> <span class="o">=</span> <span class="s2">&quot;INSERT INTO </span><span class="si">{0}</span><span class="s2"> (id, n, cab, car, cbrown, &quot;</span>\
+                                    <span class="s2">&quot;cw, cm, lai, lidfa, lidfb, rsoil, psoil, &quot;</span>\
+                                    <span class="s2">&quot;hspot, tts, tto, psi, typelidf, &quot;</span>\
+                                    <span class="s2">&quot;b2, b3, b4, b5, b6, b7, b8a, b11, b12, &quot;</span>\
+                                    <span class="s2">&quot;acquisition_date, landuse, scene_id) &quot;</span>\
+                                    <span class="s2">&quot;VALUES (</span><span class="si">{1}</span><span class="s2">, </span><span class="si">{2}</span><span class="s2">, </span><span class="si">{3}</span><span class="s2">, </span><span class="si">{4}</span><span class="s2">, </span><span class="si">{5}</span><span class="s2">, </span><span class="si">{6}</span><span class="s2">, </span><span class="si">{7}</span><span class="s2">, &quot;</span>\
+                                    <span class="s2">&quot;</span><span class="si">{8}</span><span class="s2">, </span><span class="si">{9}</span><span class="s2">, </span><span class="si">{10}</span><span class="s2">, </span><span class="si">{11}</span><span class="s2">, </span><span class="si">{12}</span><span class="s2">, </span><span class="si">{13}</span><span class="s2">, </span><span class="si">{14}</span><span class="s2">, </span><span class="si">{15}</span><span class="s2">, </span><span class="si">{16}</span><span class="s2">, </span><span class="si">{17}</span><span class="s2">, &quot;</span> \
+                                    <span class="s2">&quot;</span><span class="si">{18}</span><span class="s2">, </span><span class="si">{19}</span><span class="s2">, </span><span class="si">{20}</span><span class="s2">, </span><span class="si">{21}</span><span class="s2">, </span><span class="si">{22}</span><span class="s2">, </span><span class="si">{23}</span><span class="s2">, </span><span class="si">{24}</span><span class="s2">, </span><span class="si">{25}</span><span class="s2">, </span><span class="si">{26}</span><span class="s2">, &#39;</span><span class="si">{27}</span><span class="s2">&#39;, &quot;</span> \
+                                    <span class="s2">&quot;</span><span class="si">{28}</span><span class="s2">, &#39;</span><span class="si">{29}</span><span class="s2">&#39;) ON CONFLICT (id, scene_id, landuse) &quot;</span>\
+                                    <span class="s2">&quot;DO NOTHING;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                            <span class="n">inv_table</span><span class="p">,</span>
+                                            <span class="n">ii</span><span class="p">,</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">cab</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">car</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">cbrown</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">cw</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">cm</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">lai</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">lidfa</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">lidfb</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">rsoil</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">psoil</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">hspot</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__tts</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__tto</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__psi</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">typelidf</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">6</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">7</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">sensor_spectrum</span><span class="p">[</span><span class="mi">8</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_date</span><span class="p">,</span>
+                                            <span class="n">lc_code</span><span class="p">,</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span>
+                                            <span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">insert_statement</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">DatabaseError</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;INSERT of synthetic spectra failed!&quot;</span><span class="p">)</span>
+                    <span class="k">continue</span></div>
+            <span class="c1"># endfor -&gt; lut_table is finished</span>
+
+
+<div class="viewcode-block" id="inversion.do_obj_inversion"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion.do_obj_inversion">[docs]</a>    <span class="k">def</span> <span class="nf">do_obj_inversion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">object_id</span><span class="p">,</span> <span class="n">acqui_date</span><span class="p">,</span> <span class="n">land_use</span><span class="p">,</span> <span class="n">num_solutions</span><span class="p">,</span>
+                         <span class="n">inv_params</span><span class="p">,</span> <span class="n">res_table</span><span class="p">,</span> <span class="n">object_table</span><span class="p">,</span> <span class="n">lut_table</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        performs inversion per single object using mean of xx best</span>
+<span class="sd">        solutions (RMSE criterion) and stores result results table</span>
+<span class="sd">        params to be inverted/ returned should be passed as list of strings</span>
+<span class="sd">        e.g: inv_params = [&quot;LAI&quot;, &quot;CAB&quot;]</span>
+<span class="sd">        also inverted spectra can be returned: therefore just append the band</span>
+<span class="sd">        numbers to the list of strings of parameters:</span>
+<span class="sd">        e.g. inv_params = [&quot;LAI&quot;, &quot;CAB&quot;, &quot;B2&quot;, &quot;B3&quot;, etc.]</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        object_id : Integer</span>
+<span class="sd">            ID of the current object (derived from OBIA4RTM database)</span>
+<span class="sd">        acqui_date : Date (YYYY-MM-DD)</span>
+<span class="sd">            acquisition date of the image used for the inversion</span>
+<span class="sd">        lande_use : Integer</span>
+<span class="sd">            land cover code for the specific object and date</span>
+<span class="sd">        num_solutions : Integer</span>
+<span class="sd">            how many solutions should be used for generating the inversion result</span>
+<span class="sd">        inv_params : List</span>
+<span class="sd">            list of the parameters (must be named) to be inverted</span>
+<span class="sd">        res_table : String</span>
+<span class="sd">            tablename where to store the results of the inversion</span>
+<span class="sd">            (&lt;schema.table&gt;)</span>
+<span class="sd">        object_table : String</span>
+<span class="sd">            tablename of the table containing the object spectra</span>
+<span class="sd">            (&lt;schema.table&gt;)</span>
+<span class="sd">        lut_table : String</span>
+<span class="sd">            tablename of the lookup-table (&lt;schema.table&gt;)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        status : Integer</span>
+<span class="sd">            zero if everything is OK</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot; SELECT </span>
+<span class="s2">                        lut.id,</span>
+<span class="s2">                        rmse(obj.b2, obj.b3, obj.b4, obj.b5, obj.b6, obj.b7,</span>
+<span class="s2">                             obj.b8a, obj.b11, obj.b12,lut.b2, lut.b3, lut.b4, </span>
+<span class="s2">                             lut.b5, lut.b6, lut.b7, lut.b8a, lut.b11, lut.b12) </span>
+<span class="s2">                        AS rmse</span>
+<span class="s2">                    FROM</span>
+<span class="s2">                        </span><span class="si">{0}</span><span class="s2"> as obj,</span>
+<span class="s2">                        </span><span class="si">{1}</span><span class="s2"> as lut</span>
+<span class="s2">                    WHERE</span>
+<span class="s2">                        obj.object_id = </span><span class="si">{2}</span><span class="s2"></span>
+<span class="s2">                    AND</span>
+<span class="s2">                       obj.scene_id = &#39;</span><span class="si">{3}</span><span class="s2">&#39;</span>
+<span class="s2">                    AND</span>
+<span class="s2">                       obj.landuse = </span><span class="si">{4}</span><span class="s2"></span>
+<span class="s2">                    AND</span>
+<span class="s2">                        obj.landuse = lut.landuse</span>
+<span class="s2">                    AND</span>
+<span class="s2">                        obj.scene_id = lut.scene_id</span>
+<span class="s2">                    ORDER BY rmse ASC</span>
+<span class="s2">                    LIMIT </span><span class="si">{5}</span><span class="s2">;&quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">object_table</span><span class="p">,</span>
+                    <span class="n">lut_table</span><span class="p">,</span>
+                    <span class="n">object_id</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">,</span>
+                    <span class="n">land_use</span><span class="p">,</span>
+                    <span class="n">num_solutions</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">inv_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+            <span class="n">lut_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">inv_res</span><span class="p">]</span>
+            <span class="n">rmse_vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">inv_res</span><span class="p">]</span>
+            <span class="c1"># convert lut_ids to str</span>
+            <span class="n">lut_ids</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">lut_ids</span><span class="p">)</span>
+            <span class="n">lut_ids</span> <span class="o">=</span> <span class="n">lut_ids</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;[&quot;</span><span class="p">,</span> <span class="s2">&quot;(&quot;</span><span class="p">)</span>
+            <span class="n">lut_ids</span> <span class="o">=</span> <span class="n">lut_ids</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">,</span> <span class="s2">&quot;)&quot;</span><span class="p">)</span>
+            <span class="c1"># convert the params to be inverted in the correct format</span>
+            <span class="c1"># for SQL-query</span>
+            <span class="n">sql_snippets</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">inv_params</span><span class="p">:</span>
+                <span class="n">sql_snippet</span> <span class="o">=</span> <span class="s2">&quot;AVG(&quot;</span> <span class="o">+</span> <span class="n">param</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span>
+                <span class="n">sql_snippets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sql_snippet</span><span class="p">)</span>
+            <span class="c1"># endfor</span>
+            <span class="n">sql_snippets</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">sql_snippets</span><span class="p">)</span>
+            <span class="n">sql_snippets</span> <span class="o">=</span> <span class="n">sql_snippets</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="nb">len</span><span class="p">(</span><span class="n">sql_snippets</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">sql_snippets</span> <span class="o">=</span> <span class="n">sql_snippets</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># select the biophysical parameters from the xx best solutions in</span>
+            <span class="c1"># the lut table using the lut ids as keys</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT </span><span class="si">{0}</span><span class="s2"> FROM </span><span class="si">{1}</span><span class="s2"> WHERE id in </span><span class="si">{2}</span><span class="s2">;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sql_snippets</span><span class="p">,</span>
+                    <span class="n">lut_table</span><span class="p">,</span>
+                    <span class="n">lut_ids</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+                <span class="n">mean_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+                <span class="c1"># convert result to dictionary for storing results in DB</span>
+                <span class="n">result_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+                <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">inv_params</span><span class="p">:</span>
+                    <span class="n">result_dict</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">mean_params</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">index</span><span class="p">]</span>
+                    <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="c1"># also store the errors</span>
+                <span class="n">error_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_solutions</span><span class="p">):</span>
+                    <span class="n">error_dict</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">ii</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="n">rmse_vals</span><span class="p">[</span><span class="n">ii</span><span class="p">]</span>
+                <span class="c1"># convert to json</span>
+                <span class="n">result_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">result_dict</span><span class="p">)</span>
+                <span class="n">error_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">error_dict</span><span class="p">)</span>
+
+                <span class="c1"># insert statement</span>
+                <span class="n">insert</span> <span class="o">=</span> <span class="s2">&quot;INSERT INTO </span><span class="si">{0}</span><span class="s2"> (object_id, acquisition_date, &quot;</span>\
+                <span class="s2">&quot;inversion_results, inversion_errors, scene_id) VALUES (</span><span class="si">{1}</span><span class="s2">, &quot;</span>\
+                <span class="s2">&quot;&#39;</span><span class="si">{2}</span><span class="s2">&#39;, &#39;</span><span class="si">{3}</span><span class="s2">&#39;, &#39;</span><span class="si">{4}</span><span class="s2">&#39;, &#39;</span><span class="si">{5}</span><span class="s2">&#39;) ON CONFLICT (object_id, &quot;</span>\
+                <span class="s2">&quot;scene_id) DO NOTHING;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">res_table</span><span class="p">,</span>
+                        <span class="n">object_id</span><span class="p">,</span>
+                        <span class="n">acqui_date</span><span class="p">,</span>
+                        <span class="n">result_json</span><span class="p">,</span>
+                        <span class="n">error_json</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span>
+                        <span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">insert</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Insert of results for object &quot;</span>\
+                                        <span class="s2">&quot;</span><span class="si">{0}</span><span class="s2"> failed!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="n">object_id</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                    <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;No inversion result could be obtained &quot;</span>\
+                                    <span class="s2">&quot;for object </span><span class="si">{0}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">object_id</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+                <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Inverting object with id </span><span class="si">{0}</span><span class="s2"> failed&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">object_id</span><span class="p">),</span>
+                                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="c1"># return zero if everything was OK</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">status</span></div>
+    <span class="c1"># end function</span>
+
+
+<div class="viewcode-block" id="inversion.do_inversion"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.inversion.inversion.do_inversion">[docs]</a>    <span class="k">def</span> <span class="nf">do_inversion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">land_use</span><span class="p">,</span> <span class="n">num_solutions</span><span class="p">,</span> <span class="n">res_table</span><span class="p">,</span>
+                     <span class="n">object_table</span><span class="p">,</span> <span class="n">inv_mapping_table</span><span class="p">,</span> <span class="n">lut_table</span><span class="p">,</span>
+                     <span class="n">return_specs</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        performs inversion on all objects for a given date.</span>
+<span class="sd">        NOTE: the object reflectance values must be already available in the data</span>
+<span class="sd">        base.</span>
+<span class="sd">        Run gen_lut therefore before!</span>
+<span class="sd">        Works as a wrapper around the do_object_inversion method</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        lande_use : Integer</span>
+<span class="sd">            land cover code for the specific object and date</span>
+<span class="sd">        num_solutions : Integer</span>
+<span class="sd">            how many solutions should be used for generating the inversion result</span>
+<span class="sd">        res_table : String</span>
+<span class="sd">            tablename where to store the results of the inversion</span>
+<span class="sd">            (&lt;schema.table&gt;)</span>
+<span class="sd">        object_table : String</span>
+<span class="sd">            tablename of table containing the object spectra (&lt;schema.table&gt;)</span>
+<span class="sd">        inv_mapping_table : String</span>
+<span class="sd">            tablename of the table containing the parameters to be inverted</span>
+<span class="sd">            per acqusition date (scene) and land use/ cover class</span>
+<span class="sd">        lut_table : String</span>
+<span class="sd">            table containing the ProSAIL lut on a per scene and landuse / cover</span>
+<span class="sd">            class base</span>
+<span class="sd">        return_specs : Boolean</span>
+<span class="sd">            determines whether inverted spectra should be returned (True; default)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># read in the scene metata</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_scene_metadata</span><span class="p">()</span>
+        <span class="c1"># get list of objects available for a given land use class at a given day</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT DISTINCT object_id FROM </span><span class="si">{0}</span><span class="s2"> &quot;</span> \
+                <span class="s2">&quot; WHERE acquisition_date = &#39;</span><span class="si">{1}</span><span class="s2">&#39;&quot;</span> \
+                <span class="s2">&quot; AND landuse = </span><span class="si">{2}</span><span class="s2">;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">object_table</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_date</span><span class="p">,</span>
+                        <span class="n">land_use</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">object_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+            <span class="n">object_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">object_ids</span><span class="p">]</span>
+            
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not query objects for acquistion date &quot;</span>\
+                                <span class="s2">&quot;&#39;</span><span class="si">{0}</span><span class="s2">&#39; and LUC </span><span class="si">{1}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_date</span><span class="p">,</span>
+                    <span class="n">land_use</span><span class="p">),</span>
+                    <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="c1"># get the list of params to be inverted</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT params_to_be_inverted FROM </span><span class="si">{0}</span><span class="s2">&quot;</span> \
+                <span class="s2">&quot; WHERE scene_id = &#39;</span><span class="si">{1}</span><span class="s2">&#39; AND landuse = </span><span class="si">{2}</span><span class="s2">;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">inv_mapping_table</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">,</span>
+                        <span class="n">land_use</span>
+                        <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+            <span class="n">params_dict</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="c1"># convert to list</span>
+            <span class="n">params_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">params_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">params_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+            
+            <span class="c1"># if inverted spectra should be returned add them to params_list</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">return_specs</span><span class="p">):</span>
+                <span class="n">band_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;B2&quot;</span><span class="p">,</span> <span class="s2">&quot;B3&quot;</span><span class="p">,</span> <span class="s2">&quot;B4&quot;</span><span class="p">,</span> <span class="s2">&quot;B5&quot;</span><span class="p">,</span> <span class="s2">&quot;B6&quot;</span><span class="p">,</span> <span class="s2">&quot;B7&quot;</span><span class="p">,</span> <span class="s2">&quot;B8A&quot;</span><span class="p">,</span> <span class="s2">&quot;B11&quot;</span><span class="p">,</span> <span class="s2">&quot;B12&quot;</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">band_name</span> <span class="ow">in</span> <span class="n">band_names</span><span class="p">:</span>
+                    <span class="n">params_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">band_name</span><span class="p">)</span>
+                <span class="c1"># endfor</span>
+            <span class="c1"># endif</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Retrieving inversion metadata for acquisition &quot;</span>\
+                                <span class="s2">&quot;scene &#39;</span><span class="si">{0}</span><span class="s2">&#39; and LUC </span><span class="si">{1}</span><span class="s2"> failed!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">,</span>
+                    <span class="n">land_use</span><span class="p">),</span>
+                    <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+
+        <span class="c1"># iterate over all objects to perform the inversion per object</span>
+        <span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">object_ids</span><span class="p">)):</span>
+            <span class="n">object_id</span> <span class="o">=</span> <span class="n">object_ids</span><span class="p">[</span><span class="n">ii</span><span class="p">]</span>
+            <span class="n">resrun</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_obj_inversion</span><span class="p">(</span><span class="n">object_id</span><span class="p">,</span>
+                                           <span class="bp">self</span><span class="o">.</span><span class="n">acquisition_date</span><span class="p">,</span>
+                                           <span class="n">land_use</span><span class="p">,</span> 
+                                           <span class="n">num_solutions</span><span class="p">,</span>
+                                           <span class="n">params_list</span><span class="p">,</span>
+                                           <span class="n">res_table</span><span class="p">,</span>
+                                           <span class="n">object_table</span><span class="p">,</span>
+                                           <span class="n">lut_table</span><span class="p">)</span>
+            <span class="c1"># in case an error happened continue with next object</span>
+            <span class="k">if</span> <span class="n">resrun</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="c1"># endif</span>
+        <span class="c1"># endfor</span>
+
+        <span class="c1"># close database connection at the end</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cursor</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div></div>
+        <span class="c1"># endif</span>
+    <span class="c1"># end do_inversion</span>
+<span class="c1"># end class</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,347 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.setup_db.create_schema &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.setup_db.create_schema</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Thu Jul 25 10:15:38 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">DatabaseError</span><span class="p">,</span><span class="n">ProgrammingError</span>
+<span class="kn">from</span> <span class="nn">configparser</span> <span class="kn">import</span> <span class="n">ConfigParser</span><span class="p">,</span> <span class="n">MissingSectionHeaderError</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.logger</span> <span class="kn">import</span> <span class="n">get_logger</span><span class="p">,</span> <span class="n">close_logger</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.connect_db</span> <span class="kn">import</span> <span class="n">connect_db</span><span class="p">,</span> <span class="n">close_db_connection</span>
+
+
+<span class="n">sys_exit_message</span> <span class="o">=</span> <span class="s1">&#39;An error occured during setup of new Postgres schema. Check log!&#39;</span>
+
+
+<div class="viewcode-block" id="create_schema"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.create_schema.create_schema">[docs]</a><span class="k">def</span> <span class="nf">create_schema</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    this function is used to generate a new schema in the OBIA4RTM database.</span>
+<span class="sd">    In case the schema already exists, nothing will happen.</span>
+<span class="sd">    The schema to be created is taken from the obia4rtm_backend.cfg file</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    None</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    status : integer</span>
+<span class="sd">        zero if everything was OK</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1"># connect to OBIA4RTM database</span>
+    <span class="n">con</span><span class="p">,</span> <span class="n">cursor</span> <span class="o">=</span> <span class="n">connect_db</span><span class="p">()</span>
+    <span class="c1"># open a logger</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Trying to setup a new schema for the OBIA4RTM database&#39;</span><span class="p">)</span>
+    <span class="c1"># read in the obia4rtm_backend information to get the name of the schema</span>
+    <span class="c1"># therefore the obia4rtm_backend.cfg file must be read</span>
+    <span class="n">install_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="n">home_pointer</span> <span class="o">=</span> <span class="n">install_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;OBIA4RTM_HOME&#39;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">home_pointer</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Cannot determine OBIA4RTM Home directory!&#39;</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">home_pointer</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">data</span><span class="p">:</span>
+        <span class="n">obia4rtm_home</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="n">backend_cfg</span> <span class="o">=</span> <span class="n">obia4rtm_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;obia4rtm_backend.cfg&#39;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">backend_cfg</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Cannot read obia4rtm_backend.cfg from </span><span class="si">{}</span><span class="s1">!&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">obia4rtm_home</span><span class="p">))</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">sys_exit_message</span><span class="p">)</span>
+    <span class="c1"># now, the cfg information can be read in using the configParser class</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">ConfigParser</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">backend_cfg</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">MissingSectionHeaderError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;The obia4rtm_backend.cfg does not fulfil the formal requirements!&#39;</span><span class="p">,</span>
+                     <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># no get the name of the schema</span>
+    <span class="n">schema</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;schema-setting&#39;</span><span class="p">,</span> <span class="s1">&#39;schema_obia4rtm&#39;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">schema</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">schema</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;The version of your obia4rtm_backend.cfg file seems to be corrupt!&#39;</span><span class="p">,</span>
+                     <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">sys_exit_message</span><span class="p">)</span>
+    <span class="c1"># if the schema name is OK, the schema can be created</span>
+    <span class="c1"># if the schema already exists in the current database, nothing will happen</span>
+    <span class="n">sql</span> <span class="o">=</span> <span class="s1">&#39;CREATE SCHEMA IF NOT EXISTS </span><span class="si">{}</span><span class="s1">;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span>
+    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+    <span class="n">con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="c1"># enable PostGIS and HSTORE extension</span>
+    <span class="c1"># enable the PostGIS extension</span>
+    <span class="c1"># in case it fails it is most likely because the extension was almost</span>
+    <span class="c1"># enabled as it should</span>
+    <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;CREATE EXTENSION PostGIS;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">ProgrammingError</span><span class="p">,</span> <span class="n">DatabaseError</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;PostGIS already enabled!&quot;</span><span class="p">)</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="k">pass</span>
+    <span class="c1"># enable the HSTORE extension</span>
+    <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;CREATE EXTENSION HSTORE;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">ProgrammingError</span><span class="p">,</span> <span class="n">DatabaseError</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;HSTORE already enabled!&quot;</span><span class="p">)</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="k">pass</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Successfully created schema &#39;</span><span class="si">{}</span><span class="s2">&#39; in current OBIA4RTM database!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">schema</span><span class="p">))</span>
+    <span class="c1"># after that the schema-specific tables are created that are required</span>
+    <span class="c1"># in OBIA4RTM</span>
+    <span class="n">sql_home</span> <span class="o">=</span> <span class="n">install_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;SQL&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Tables&#39;</span>
+    <span class="c1"># the tables &#39;s2_inversion_results, s2_lookuptable, s2_objects and s2_inversion_mapping</span>
+    <span class="c1"># must be created within the schema</span>
+    <span class="c1"># check if the tables already exist before trying to create them</span>
+    <span class="n">sql_scripts</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;s2_lookuptable.sql&#39;</span><span class="p">,</span><span class="s1">&#39;s2_inversion_results.sql&#39;</span><span class="p">,</span> <span class="s1">&#39;s2_objects.sql&#39;</span><span class="p">,</span> <span class="s1">&#39;inversion_mapping.sql&#39;</span><span class="p">]</span>
+    <span class="c1"># go through the config file to get the table-names</span>
+    <span class="n">table_names</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">table_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;schema-setting&#39;</span><span class="p">,</span> <span class="s1">&#39;table_lookuptabe&#39;</span><span class="p">))</span>
+    <span class="n">table_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;schema-setting&#39;</span><span class="p">,</span> <span class="s1">&#39;table_inv_results&#39;</span><span class="p">))</span>
+    <span class="n">table_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;schema-setting&#39;</span><span class="p">,</span> <span class="s1">&#39;table_object_spectra&#39;</span><span class="p">))</span>
+    <span class="n">table_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;schema-setting&#39;</span><span class="p">,</span> <span class="s1">&#39;table_inv_mapping&#39;</span><span class="p">))</span>
+    <span class="c1"># the parser can be cleared now as all information is read</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+    <span class="c1"># iterate through the 4 scripts to create the tables given they not exist</span>
+    <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sql_scripts</span><span class="p">)):</span>
+        <span class="n">sql_script</span> <span class="o">=</span> <span class="n">sql_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">sql_scripts</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">table_name</span> <span class="o">=</span> <span class="n">table_names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="c1"># check if the table already exists</span>
+        <span class="n">exists</span> <span class="o">=</span> <span class="n">check_if_exists</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">cursor</span><span class="p">)</span>
+        <span class="c1"># if already exists table log a warning and continue with the next table</span>
+        <span class="k">if</span> <span class="n">exists</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Table &#39;</span><span class="si">{0}</span><span class="s2">&#39; already exists in schema &#39;</span><span class="si">{1}</span><span class="s2">&#39; - skipping&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">table_name</span><span class="p">,</span>
+                    <span class="n">schema</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="c1"># else create the table</span>
+        <span class="c1"># get the corresponding sql-statment and try to execute it</span>
+        <span class="n">sql_statement</span> <span class="o">=</span> <span class="n">create_sql_statement</span><span class="p">(</span><span class="n">sql_script</span><span class="p">,</span>
+                                             <span class="n">schema</span><span class="p">,</span>
+                                             <span class="n">table_name</span><span class="p">,</span>
+                                             <span class="n">logger</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql_statement</span><span class="p">)</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Creating table &#39;</span><span class="si">{0}</span><span class="s2">&#39; in schema &#39;</span><span class="si">{1}</span><span class="s2">&#39; failed!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">table_name</span><span class="p">,</span> <span class="n">schema</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">sys_exit_message</span><span class="p">)</span>
+        <span class="c1"># log success</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Successfully created table &#39;</span><span class="si">{0}</span><span class="s2">&#39; in schema &#39;</span><span class="si">{1}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">table_name</span><span class="p">,</span> <span class="n">schema</span><span class="p">))</span>
+    <span class="c1"># create the RMSE function required for inverting the spectra</span>
+    <span class="n">fun_home</span> <span class="o">=</span> <span class="n">install_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;SQL&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Queries_Functions&#39;</span>
+    <span class="n">rmse_fun</span> <span class="o">=</span> <span class="n">fun_home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;rmse_function.sql&#39;</span>
+    <span class="n">sql_statement</span> <span class="o">=</span> <span class="n">create_function_statement</span><span class="p">(</span><span class="n">rmse_fun</span><span class="p">,</span> <span class="n">logger</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql_statement</span><span class="p">)</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Creating function &#39;</span><span class="si">{0}</span><span class="s2">&#39; failed!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">rmse_fun</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">sys_exit_message</span><span class="p">)</span>
+    <span class="c1"># after iterating, the db connection and the logger can be close</span>
+    <span class="n">close_db_connection</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">cursor</span><span class="p">)</span>
+    <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">status</span></div>
+
+
+<div class="viewcode-block" id="create_sql_statement"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.create_schema.create_sql_statement">[docs]</a><span class="k">def</span> <span class="nf">create_sql_statement</span><span class="p">(</span><span class="n">sql_file</span><span class="p">,</span> <span class="n">schema</span><span class="p">,</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    auxiiliary function to create the sql_statement required to create</span>
+<span class="sd">    the specific tables in the DB schema</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sql_file : String</span>
+<span class="sd">        file-path to the sql-template containing the sql-statement for creating the table</span>
+<span class="sd">    schema : String</span>
+<span class="sd">        name of the schema the table should be created in</span>
+<span class="sd">    table_name : String</span>
+<span class="sd">        name of the table to be created</span>
+<span class="sd">    logger : logging.Logger</span>
+<span class="sd">        for logging errors</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sql_statement : String</span>
+<span class="sd">        processed and ready-to-execute sql statement</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">fopen</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">sql_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">fopen</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">fopen</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Failed to read the SQL-script</span><span class="se">\n</span><span class="s1">Reason:&#39;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">sys_exit_message</span><span class="p">)</span>
+    <span class="c1"># extract the SQL statement</span>
+    <span class="c1"># &#39;--&#39; indicates comments</span>
+    <span class="n">comment</span> <span class="o">=</span> <span class="s1">&#39;--&#39;</span>
+    <span class="n">sql_statement</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">comment</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+    <span class="n">sql_statement</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">sql_statement</span><span class="p">))</span>
+    <span class="c1"># now, replace &quot;schema_name&quot; and &quot;table_name&quot; with their actual values</span>
+    <span class="n">sql_statement</span> <span class="o">=</span> <span class="n">sql_statement</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;schema_name&#39;</span><span class="p">,</span> <span class="n">schema</span><span class="p">)</span>
+    <span class="n">sql_statement</span> <span class="o">=</span> <span class="n">sql_statement</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;table_name&#39;</span><span class="p">,</span> <span class="n">table_name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sql_statement</span></div>
+
+
+<div class="viewcode-block" id="create_function_statement"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.create_schema.create_function_statement">[docs]</a><span class="k">def</span> <span class="nf">create_function_statement</span><span class="p">(</span><span class="n">sql_function</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    create a SQL statement for creating/ replacing a SQL function</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sql_function : String</span>
+<span class="sd">        file-path to the sql-function</span>
+<span class="sd">    logger : logging.Logger</span>
+<span class="sd">        for logging errors</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sql_statement : String</span>
+<span class="sd">        processed and ready-to-execute sql statement</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">fopen</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">sql_function</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">fopen</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">fopen</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Failed to read the SQL-script</span><span class="se">\n</span><span class="s1">Reason:&#39;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">sys_exit_message</span><span class="p">)</span>
+    <span class="c1"># extract the SQL statement</span>
+    <span class="c1"># &#39;--&#39; indicates comments</span>
+    <span class="n">comment</span> <span class="o">=</span> <span class="s1">&#39;--&#39;</span>
+    <span class="n">sql_statement</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">comment</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+    <span class="n">sql_statement</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">sql_statement</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">sql_statement</span></div>
+
+
+<div class="viewcode-block" id="check_if_exists"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.setup_db.create_schema.check_if_exists">[docs]</a><span class="k">def</span> <span class="nf">check_if_exists</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">table_name</span><span class="p">,</span> <span class="n">cursor</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    auxiiliary function to check whether a given table exists in a given schema</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    schema : String</span>
+<span class="sd">        name of the schema the table should be created in</span>
+<span class="sd">    table_name : String</span>
+<span class="sd">        name of the table to be created</span>
+<span class="sd">    cursor : psycopg2 Database Cursor</span>
+<span class="sd">        for querying the database</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    exists : Boolean</span>
+<span class="sd">        True, if table already exists, False else</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT EXISTS (</span>
+<span class="s2">        SELECT 1</span>
+<span class="s2">        FROM   information_schema.tables </span>
+<span class="s2">        WHERE  table_schema = &#39;</span><span class="si">{0}</span><span class="s2">&#39;</span>
+<span class="s2">        AND    table_name = &#39;</span><span class="si">{1}</span><span class="s2">&#39;</span>
+<span class="s2">        );&quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="n">schema</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
+        <span class="n">table_name</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+    <span class="n">exists</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">exists</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

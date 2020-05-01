@@ -1,0 +1,587 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Fri Jul 26 13:45:23 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM with code taken from</span>
+<span class="sd">https://github.com/samsammurphy/gee-atmcorr-S2 available under Apache 2.0 licence</span>
+<span class="sd">This module contains a class that is mainly a object-oriented version of the</span>
+<span class="sd">jupyter notebook available in the repository outlined above. Some modifactions</span>
+<span class="sd">were made to fit the requirements of OBIA4RTM.</span>
+
+<span class="sd">NOTE: This module makes use of Google Earth Engine.</span>
+<span class="sd">For setting up the Python Client API please see:</span>
+<span class="sd">    https://developers.google.com/earth-engine/python_install</span>
+
+<span class="sd">Copyright (c) Sam Murphy (https://github.com/samsammurphy)</span>
+
+<span class="sd">Slight changes from the original source code were made (class structure);</span>
+<span class="sd">functionalities themselves have not been altered</span>
+
+<span class="sd">Apache License</span>
+<span class="sd">                           Version 2.0, January 2004</span>
+<span class="sd">                        http://www.apache.org/licenses/</span>
+
+<span class="sd">   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION</span>
+
+<span class="sd">   1. Definitions.</span>
+
+<span class="sd">      &quot;License&quot; shall mean the terms and conditions for use, reproduction,</span>
+<span class="sd">      and distribution as defined by Sections 1 through 9 of this document.</span>
+
+<span class="sd">      &quot;Licensor&quot; shall mean the copyright owner or entity authorized by</span>
+<span class="sd">      the copyright owner that is granting the License.</span>
+
+<span class="sd">      &quot;Legal Entity&quot; shall mean the union of the acting entity and all</span>
+<span class="sd">      other entities that control, are controlled by, or are under common</span>
+<span class="sd">      control with that entity. For the purposes of this definition,</span>
+<span class="sd">      &quot;control&quot; means (i) the power, direct or indirect, to cause the</span>
+<span class="sd">      direction or management of such entity, whether by contract or</span>
+<span class="sd">      otherwise, or (ii) ownership of fifty percent (50%) or more of the</span>
+<span class="sd">      outstanding shares, or (iii) beneficial ownership of such entity.</span>
+
+<span class="sd">      &quot;You&quot; (or &quot;Your&quot;) shall mean an individual or Legal Entity</span>
+<span class="sd">      exercising permissions granted by this License.</span>
+
+<span class="sd">      &quot;Source&quot; form shall mean the preferred form for making modifications,</span>
+<span class="sd">      including but not limited to software source code, documentation</span>
+<span class="sd">      source, and configuration files.</span>
+
+<span class="sd">      &quot;Object&quot; form shall mean any form resulting from mechanical</span>
+<span class="sd">      transformation or translation of a Source form, including but</span>
+<span class="sd">      not limited to compiled object code, generated documentation,</span>
+<span class="sd">      and conversions to other media types.</span>
+
+<span class="sd">      &quot;Work&quot; shall mean the work of authorship, whether in Source or</span>
+<span class="sd">      Object form, made available under the License, as indicated by a</span>
+<span class="sd">      copyright notice that is included in or attached to the work</span>
+<span class="sd">      (an example is provided in the Appendix below).</span>
+
+<span class="sd">      &quot;Derivative Works&quot; shall mean any work, whether in Source or Object</span>
+<span class="sd">      form, that is based on (or derived from) the Work and for which the</span>
+<span class="sd">      editorial revisions, annotations, elaborations, or other modifications</span>
+<span class="sd">      represent, as a whole, an original work of authorship. For the purposes</span>
+<span class="sd">      of this License, Derivative Works shall not include works that remain</span>
+<span class="sd">      separable from, or merely link (or bind by name) to the interfaces of,</span>
+<span class="sd">      the Work and Derivative Works thereof.</span>
+
+<span class="sd">      &quot;Contribution&quot; shall mean any work of authorship, including</span>
+<span class="sd">      the original version of the Work and any modifications or additions</span>
+<span class="sd">      to that Work or Derivative Works thereof, that is intentionally</span>
+<span class="sd">      submitted to Licensor for inclusion in the Work by the copyright owner</span>
+<span class="sd">      or by an individual or Legal Entity authorized to submit on behalf of</span>
+<span class="sd">      the copyright owner. For the purposes of this definition, &quot;submitted&quot;</span>
+<span class="sd">      means any form of electronic, verbal, or written communication sent</span>
+<span class="sd">      to the Licensor or its representatives, including but not limited to</span>
+<span class="sd">      communication on electronic mailing lists, source code control systems,</span>
+<span class="sd">      and issue tracking systems that are managed by, or on behalf of, the</span>
+<span class="sd">      Licensor for the purpose of discussing and improving the Work, but</span>
+<span class="sd">      excluding communication that is conspicuously marked or otherwise</span>
+<span class="sd">      designated in writing by the copyright owner as &quot;Not a Contribution.&quot;</span>
+
+<span class="sd">      &quot;Contributor&quot; shall mean Licensor and any individual or Legal Entity</span>
+<span class="sd">      on behalf of whom a Contribution has been received by Licensor and</span>
+<span class="sd">      subsequently incorporated within the Work.</span>
+
+<span class="sd">   2. Grant of Copyright License. Subject to the terms and conditions of</span>
+<span class="sd">      this License, each Contributor hereby grants to You a perpetual,</span>
+<span class="sd">      worldwide, non-exclusive, no-charge, royalty-free, irrevocable</span>
+<span class="sd">      copyright license to reproduce, prepare Derivative Works of,</span>
+<span class="sd">      publicly display, publicly perform, sublicense, and distribute the</span>
+<span class="sd">      Work and such Derivative Works in Source or Object form.</span>
+
+<span class="sd">   3. Grant of Patent License. Subject to the terms and conditions of</span>
+<span class="sd">      this License, each Contributor hereby grants to You a perpetual,</span>
+<span class="sd">      worldwide, non-exclusive, no-charge, royalty-free, irrevocable</span>
+<span class="sd">      (except as stated in this section) patent license to make, have made,</span>
+<span class="sd">      use, offer to sell, sell, import, and otherwise transfer the Work,</span>
+<span class="sd">      where such license applies only to those patent claims licensable</span>
+<span class="sd">      by such Contributor that are necessarily infringed by their</span>
+<span class="sd">      Contribution(s) alone or by combination of their Contribution(s)</span>
+<span class="sd">      with the Work to which such Contribution(s) was submitted. If You</span>
+<span class="sd">      institute patent litigation against any entity (including a</span>
+<span class="sd">      cross-claim or counterclaim in a lawsuit) alleging that the Work</span>
+<span class="sd">      or a Contribution incorporated within the Work constitutes direct</span>
+<span class="sd">      or contributory patent infringement, then any patent licenses</span>
+<span class="sd">      granted to You under this License for that Work shall terminate</span>
+<span class="sd">      as of the date such litigation is filed.</span>
+
+<span class="sd">   4. Redistribution. You may reproduce and distribute copies of the</span>
+<span class="sd">      Work or Derivative Works thereof in any medium, with or without</span>
+<span class="sd">      modifications, and in Source or Object form, provided that You</span>
+<span class="sd">      meet the following conditions:</span>
+
+<span class="sd">      (a) You must give any other recipients of the Work or</span>
+<span class="sd">          Derivative Works a copy of this License; and</span>
+
+<span class="sd">      (b) You must cause any modified files to carry prominent notices</span>
+<span class="sd">          stating that You changed the files; and</span>
+
+<span class="sd">      (c) You must retain, in the Source form of any Derivative Works</span>
+<span class="sd">          that You distribute, all copyright, patent, trademark, and</span>
+<span class="sd">          attribution notices from the Source form of the Work,</span>
+<span class="sd">          excluding those notices that do not pertain to any part of</span>
+<span class="sd">          the Derivative Works; and</span>
+
+<span class="sd">      (d) If the Work includes a &quot;NOTICE&quot; text file as part of its</span>
+<span class="sd">          distribution, then any Derivative Works that You distribute must</span>
+<span class="sd">          include a readable copy of the attribution notices contained</span>
+<span class="sd">          within such NOTICE file, excluding those notices that do not</span>
+<span class="sd">          pertain to any part of the Derivative Works, in at least one</span>
+<span class="sd">          of the following places: within a NOTICE text file distributed</span>
+<span class="sd">          as part of the Derivative Works; within the Source form or</span>
+<span class="sd">          documentation, if provided along with the Derivative Works; or,</span>
+<span class="sd">          within a display generated by the Derivative Works, if and</span>
+<span class="sd">          wherever such third-party notices normally appear. The contents</span>
+<span class="sd">          of the NOTICE file are for informational purposes only and</span>
+<span class="sd">          do not modify the License. You may add Your own attribution</span>
+<span class="sd">          notices within Derivative Works that You distribute, alongside</span>
+<span class="sd">          or as an addendum to the NOTICE text from the Work, provided</span>
+<span class="sd">          that such additional attribution notices cannot be construed</span>
+<span class="sd">          as modifying the License.</span>
+
+<span class="sd">      You may add Your own copyright statement to Your modifications and</span>
+<span class="sd">      may provide additional or different license terms and conditions</span>
+<span class="sd">      for use, reproduction, or distribution of Your modifications, or</span>
+<span class="sd">      for any such Derivative Works as a whole, provided Your use,</span>
+<span class="sd">      reproduction, and distribution of the Work otherwise complies with</span>
+<span class="sd">      the conditions stated in this License.</span>
+
+<span class="sd">   5. Submission of Contributions. Unless You explicitly state otherwise,</span>
+<span class="sd">      any Contribution intentionally submitted for inclusion in the Work</span>
+<span class="sd">      by You to the Licensor shall be under the terms and conditions of</span>
+<span class="sd">      this License, without any additional terms or conditions.</span>
+<span class="sd">      Notwithstanding the above, nothing herein shall supersede or modify</span>
+<span class="sd">      the terms of any separate license agreement you may have executed</span>
+<span class="sd">      with Licensor regarding such Contributions.</span>
+
+<span class="sd">   6. Trademarks. This License does not grant permission to use the trade</span>
+<span class="sd">      names, trademarks, service marks, or product names of the Licensor,</span>
+<span class="sd">      except as required for reasonable and customary use in describing the</span>
+<span class="sd">      origin of the Work and reproducing the content of the NOTICE file.</span>
+
+<span class="sd">   7. Disclaimer of Warranty. Unless required by applicable law or</span>
+<span class="sd">      agreed to in writing, Licensor provides the Work (and each</span>
+<span class="sd">      Contributor provides its Contributions) on an &quot;AS IS&quot; BASIS,</span>
+<span class="sd">      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or</span>
+<span class="sd">      implied, including, without limitation, any warranties or conditions</span>
+<span class="sd">      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A</span>
+<span class="sd">      PARTICULAR PURPOSE. You are solely responsible for determining the</span>
+<span class="sd">      appropriateness of using or redistributing the Work and assume any</span>
+<span class="sd">      risks associated with Your exercise of permissions under this License.</span>
+
+<span class="sd">   8. Limitation of Liability. In no event and under no legal theory,</span>
+<span class="sd">      whether in tort (including negligence), contract, or otherwise,</span>
+<span class="sd">      unless required by applicable law (such as deliberate and grossly</span>
+<span class="sd">      negligent acts) or agreed to in writing, shall any Contributor be</span>
+<span class="sd">      liable to You for damages, including any direct, indirect, special,</span>
+<span class="sd">      incidental, or consequential damages of any character arising as a</span>
+<span class="sd">      result of this License or out of the use or inability to use the</span>
+<span class="sd">      Work (including but not limited to damages for loss of goodwill,</span>
+<span class="sd">      work stoppage, computer failure or malfunction, or any and all</span>
+<span class="sd">      other commercial damages or losses), even if such Contributor</span>
+<span class="sd">      has been advised of the possibility of such damages.</span>
+
+<span class="sd">   9. Accepting Warranty or Additional Liability. While redistributing</span>
+<span class="sd">      the Work or Derivative Works thereof, You may choose to offer,</span>
+<span class="sd">      and charge a fee for, acceptance of support, warranty, indemnity,</span>
+<span class="sd">      or other liability obligations and/or rights consistent with this</span>
+<span class="sd">      License. However, in accepting such obligations, You may act only</span>
+<span class="sd">      on Your own behalf and on Your sole responsibility, not on behalf</span>
+<span class="sd">      of any other Contributor, and only if You agree to indemnify,</span>
+<span class="sd">      defend, and hold each Contributor harmless for any liability</span>
+<span class="sd">      incurred by, or claims asserted against, such Contributor by reason</span>
+<span class="sd">      of your accepting any such warranty or additional liability.</span>
+
+<span class="sd">   END OF TERMS AND CONDITIONS</span>
+
+<span class="sd">   APPENDIX: How to apply the Apache License to your work.</span>
+
+<span class="sd">      To apply the Apache License to your work, attach the following</span>
+<span class="sd">      boilerplate notice, with the fields enclosed by brackets &quot;{}&quot;</span>
+<span class="sd">      replaced with your own identifying information. (Don&#39;t include</span>
+<span class="sd">      the brackets!)  The text should be enclosed in the appropriate</span>
+<span class="sd">      comment syntax for the file format. We also recommend that a</span>
+<span class="sd">      file or class name and description of purpose be included on the</span>
+<span class="sd">      same &quot;printed page&quot; as the copyright notice for easier</span>
+<span class="sd">      identification within third-party archives.</span>
+
+<span class="sd">   Copyright {yyyy} {name of copyright owner}</span>
+
+<span class="sd">   Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="sd">   you may not use this file except in compliance with the License.</span>
+<span class="sd">   You may obtain a copy of the License at</span>
+
+<span class="sd">       http://www.apache.org/licenses/LICENSE-2.0</span>
+
+<span class="sd">   Unless required by applicable law or agreed to in writing, software</span>
+<span class="sd">   distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="sd">   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="sd">   See the License for the specific language governing permissions and</span>
+<span class="sd">   limitations under the License.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">Py6S</span> <span class="kn">import</span> <span class="n">PredefinedWavelengths</span><span class="p">,</span> <span class="n">SixS</span><span class="p">,</span> <span class="n">Wavelength</span><span class="p">,</span> <span class="n">AtmosProfile</span><span class="p">,</span> <span class="n">AeroProfile</span><span class="p">,</span> <span class="n">Geometry</span><span class="p">,</span> <span class="n">OutputParsingError</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">ee</span>
+<span class="kn">from</span> <span class="nn">ee.ee_exception</span> <span class="kn">import</span> <span class="n">EEException</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.S2_PreProcessor.atmospheric</span> <span class="kn">import</span> <span class="n">Atmospheric</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.S2_PreProcessor.cloud_masking</span> <span class="kn">import</span> <span class="n">mask_clouds</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.logger</span> <span class="kn">import</span> <span class="n">get_logger</span><span class="p">,</span> <span class="n">close_logger</span>
+
+
+<div class="viewcode-block" id="s2_Py6S_atcorr"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor.s2_Py6S_atcorr">[docs]</a><span class="k">class</span> <span class="nc">s2_Py6S_atcorr</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    class for performing Sentinel-2 atmospheric correction of Top-of-Atmosphere</span>
+<span class="sd">    imagery to Surface Reflectance values using the 6S algorithm.</span>
+<span class="sd">    Code written by Sam Murphy (https://github.com/samsammurphy) and made</span>
+<span class="sd">    availabe via Apache License 2.0 on Github</span>
+<span class="sd">    (https://github.com/samsammurphy/gee-atmcorr-S2).</span>
+<span class="sd">    Slightly modified by Lukas Graf for usage in OBIA4RTM</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        class constructor and basic setup of processing environment</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># find the directory the 6S binary has been installed to</span>
+        <span class="c1"># this is a sub-directory of the OBIA4RTM_HOME</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;OBIA4RTM_HOME&#39;</span><span class="p">,</span>
+                  <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">obia4rtm_dir</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sixS_install_dir</span> <span class="o">=</span> <span class="n">obia4rtm_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;sixS&#39;</span><span class="o">+</span>  <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;src&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;6SV1.1&#39;</span>
+        <span class="c1"># make sure that 6S is installed</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sixS_install_dir</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: 6S is not installed on your computer or cannot be found!</span><span class="se">\n</span><span class="s2">&quot;</span>\
+                  <span class="s2">&quot;Expected installation location: &#39;</span><span class="si">{}</span><span class="s2">&#39;</span><span class="se">\n</span><span class="s2">&quot;</span>\
+                  <span class="s2">&quot;You might want to run OBIA4RTM.S2_PreProcessor.install_6S &quot;</span>\
+                  <span class="s2">&quot;for installing 6S&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sixS_install_dir</span><span class="p">))</span>
+        <span class="c1"># add this directory of 6S binary to system path temporally (does not work properly)</span>
+        <span class="c1"># sys.path.append(sixS_install_dir)</span>
+        <span class="c1"># get a logger for recording sucess and error messages</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Setting up Google EE environment for Sentinel-2 &#39;</span>\
+                           <span class="s1">&#39;atmospheric correction using the 6S algorithm&#39;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ee</span><span class="o">.</span><span class="n">Initialize</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">EEException</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;No (valid) Earth-Engine credentials provided!&#39;</span><span class="p">,</span>
+                                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># for storing the metadata</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># for the image object</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">S2</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># for the solar zenith angle and the scene timestamp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">solar_z</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scene_date</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="s2_Py6S_atcorr.spectralResponseFunction"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor.s2_Py6S_atcorr.spectralResponseFunction">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">spectralResponseFunction</span><span class="p">(</span><span class="n">bandname</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract spectral response function for given band name</span>
+<span class="sd">        Modification of the original source code:</span>
+<span class="sd">        only those bands are available that are used in OBIA4RTM</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        bandname : String</span>
+<span class="sd">            Name of the Sentinel-2 spectral band to be processed, only the</span>
+<span class="sd">            nine Sentinel-2 bands used in OBIA4RTM are processed</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Wavelength : Tuple</span>
+<span class="sd">            wavelengths of the desired Sentinel-2 band (required for 6S to run)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">bandSelect</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;B1&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_01</span><span class="p">,</span>
+            <span class="s1">&#39;B2&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_02</span><span class="p">,</span>
+            <span class="s1">&#39;B3&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_03</span><span class="p">,</span>
+            <span class="s1">&#39;B4&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_04</span><span class="p">,</span>
+            <span class="s1">&#39;B5&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_05</span><span class="p">,</span>
+            <span class="s1">&#39;B6&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_06</span><span class="p">,</span>
+            <span class="s1">&#39;B7&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_07</span><span class="p">,</span>
+            <span class="s1">&#39;B8A&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_09</span><span class="p">,</span>
+            <span class="s1">&#39;B11&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_12</span><span class="p">,</span>
+            <span class="s1">&#39;B12&#39;</span><span class="p">:</span><span class="n">PredefinedWavelengths</span><span class="o">.</span><span class="n">S2A_MSI_13</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="k">return</span> <span class="n">Wavelength</span><span class="p">(</span><span class="n">bandSelect</span><span class="p">[</span><span class="n">bandname</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="s2_Py6S_atcorr.toa_to_rad"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor.s2_Py6S_atcorr.toa_to_rad">[docs]</a>    <span class="k">def</span> <span class="nf">toa_to_rad</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bandname</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts top of atmosphere reflectance to at-sensor radiance</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        bandname : String</span>
+<span class="sd">            name of the Sentinel-2 spectral band to be processed, only the</span>
+<span class="sd">            nine Sentinel-2 bands used in OBIA4RTM are processed</span>
+<span class="sd">        info : Dictionary</span>
+<span class="sd">            metadata available form GEE image</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        rad : ee.image.Image</span>
+<span class="sd">            At sensor Radiance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># solar exoatmospheric spectral irradiance</span>
+        <span class="n">ESUN</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;SOLAR_IRRADIANCE_&#39;</span><span class="o">+</span><span class="n">bandname</span><span class="p">]</span>
+        <span class="n">solar_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;MEAN_SOLAR_ZENITH_ANGLE&#39;</span><span class="p">]</span>
+        <span class="n">solar_angle_correction</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">solar_z</span><span class="p">))</span>
+        <span class="c1"># Earth-Sun distance (from day of year)</span>
+        <span class="n">doy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scene_date</span><span class="o">.</span><span class="n">timetuple</span><span class="p">()</span><span class="o">.</span><span class="n">tm_yday</span>
+        <span class="c1"># http://physics.stackexchange.com/questions/177949/earth-sun-distance-on-a-given-day-of-the-year</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">0.01672</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mf">0.9856</span> <span class="o">*</span> <span class="p">(</span><span class="n">doy</span><span class="o">-</span><span class="mi">4</span><span class="p">))</span>
+        <span class="c1"># conversion factor</span>
+        <span class="n">multiplier</span> <span class="o">=</span> <span class="n">ESUN</span><span class="o">*</span><span class="n">solar_angle_correction</span><span class="o">/</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="o">*</span><span class="n">d</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="c1"># at-sensor radiance</span>
+        <span class="n">rad</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">S2</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">bandname</span><span class="p">)</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">multiplier</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rad</span></div>
+
+
+<div class="viewcode-block" id="s2_Py6S_atcorr.surface_reflectance"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor.s2_Py6S_atcorr.surface_reflectance">[docs]</a>    <span class="k">def</span> <span class="nf">surface_reflectance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">bandname</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate surface reflectance from at-sensor radiance given waveband name</span>
+<span class="sd">        using the 6S algorithm</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        s : Six6 object</span>
+<span class="sd">            object of Py6S class</span>
+<span class="sd">        bandname : String</span>
+<span class="sd">            name of the Sentinel-2 spectral band to be processed, only the</span>
+<span class="sd">            nine Sentinel-2 bands used in OBIA4RTM are processed</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ref : ee.image.Image</span>
+<span class="sd">            surface reflectance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># run 6S for this waveband</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">wavelength</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spectralResponseFunction</span><span class="p">(</span><span class="n">bandname</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">s</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="c1"># extract 6S outputs</span>
+            <span class="n">Edir</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">outputs</span><span class="o">.</span><span class="n">direct_solar_irradiance</span>             <span class="c1">#direct solar irradiance</span>
+            <span class="n">Edif</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">outputs</span><span class="o">.</span><span class="n">diffuse_solar_irradiance</span>            <span class="c1">#diffuse solar irradiance</span>
+            <span class="n">Lp</span>   <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">outputs</span><span class="o">.</span><span class="n">atmospheric_intrinsic_radiance</span>      <span class="c1">#path radiance</span>
+            <span class="n">absorb</span>  <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">outputs</span><span class="o">.</span><span class="n">trans</span><span class="p">[</span><span class="s1">&#39;global_gas&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">upward</span>       <span class="c1">#absorption transmissivity</span>
+            <span class="n">scatter</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">outputs</span><span class="o">.</span><span class="n">trans</span><span class="p">[</span><span class="s1">&#39;total_scattering&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">upward</span> <span class="c1">#scattering transmissivity</span>
+            <span class="n">tau2</span> <span class="o">=</span> <span class="n">absorb</span> <span class="o">*</span> <span class="n">scatter</span>                              <span class="c1">#total transmissivity</span>
+        <span class="k">except</span> <span class="n">OutputParsingError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Failed to read 6S outputs!&#39;</span><span class="p">,</span>
+                                <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># radiance to surface reflectance</span>
+        <span class="n">rad</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">toa_to_rad</span><span class="p">(</span><span class="n">bandname</span><span class="p">)</span>
+        <span class="n">ref</span> <span class="o">=</span> <span class="n">rad</span><span class="o">.</span><span class="n">subtract</span><span class="p">(</span><span class="n">Lp</span><span class="p">)</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span><span class="n">tau2</span><span class="o">*</span><span class="p">(</span><span class="n">Edir</span><span class="o">+</span><span class="n">Edif</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">ref</span></div>
+
+
+<div class="viewcode-block" id="s2_Py6S_atcorr.run_py6s"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor.s2_Py6S_atcorr.run_py6s">[docs]</a>    <span class="k">def</span> <span class="nf">run_py6s</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">geom</span><span class="p">,</span> <span class="n">acqui_date</span><span class="p">,</span> <span class="n">option</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        runs the 6S algorithm for atmospheric correction on a user-defined</span>
+<span class="sd">        geometry and date on Sentinel-2 imagery</span>
+<span class="sd">        Requires Google Earth-Engine Python API client</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        geom : EE-Geometry</span>
+<span class="sd">            Google EE geometry specify the geographic extent to be processed</span>
+<span class="sd">        acqui_date : String</span>
+<span class="sd">            date (YYYY-MM-dd) of the desired scene to be processed</span>
+<span class="sd">        option : Integer</span>
+<span class="sd">            for computing the cloud mask the user can decide whether the</span>
+<span class="sd">            ESA delivered quality layer should be used for cloud masking</span>
+<span class="sd">            (option=1) or an alternative approach originally developed for</span>
+<span class="sd">            Landsat TM (option=2) should be used (Def=1)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        s2_surf : ee.image.Image</span>
+<span class="sd">            Google EE image instance with surface reflectance values</span>
+<span class="sd">            and two additional bands containing Clouds (&#39;CloudMask&#39;) and</span>
+<span class="sd">            detected cloud shadows (&#39;CloudShadows&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">date</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Date</span><span class="p">(</span><span class="n">acqui_date</span><span class="p">)</span>
+        <span class="c1"># get the Sentinel-2 image at or immediately after the specified date</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">S2</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span>
+                <span class="n">ee</span><span class="o">.</span><span class="n">ImageCollection</span><span class="p">(</span><span class="s1">&#39;COPERNICUS/S2&#39;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">filterBounds</span><span class="p">(</span><span class="n">geom</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">filterDate</span><span class="p">(</span><span class="n">date</span><span class="p">,</span><span class="n">date</span><span class="o">.</span><span class="n">advance</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="s1">&#39;month&#39;</span><span class="p">))</span>
+                <span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s1">&#39;system:time_start&#39;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">first</span><span class="p">()</span>
+                <span class="p">)</span>
+        <span class="c1"># extract the relevant metadata for carrying out the atmospheric correction</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">S2</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()[</span><span class="s1">&#39;properties&#39;</span><span class="p">]</span>
+        <span class="c1"># get the solar zenith angle an the scene data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scene_date</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcfromtimestamp</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;system:time_start&#39;</span><span class="p">]</span><span class="o">/</span><span class="mi">1000</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">solar_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;MEAN_SOLAR_ZENITH_ANGLE&#39;</span><span class="p">]</span>
+        <span class="c1"># log the identifier of the processed scene</span>
+        <span class="n">scene_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;DATASTRIP_ID&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting Processing scene &#39;</span><span class="si">{}</span><span class="s2">&#39; using GEE and Py6S&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">scene_id</span><span class="p">))</span>
+        <span class="c1"># get the atmospheric constituents</span>
+        <span class="c1"># i.e water vapor (h2o), ozone (o3), aerosol optical thickness (aot)</span>
+        <span class="n">h2o</span> <span class="o">=</span> <span class="n">Atmospheric</span><span class="o">.</span><span class="n">water</span><span class="p">(</span><span class="n">geom</span><span class="p">,</span> <span class="n">date</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+        <span class="n">o3</span> <span class="o">=</span> <span class="n">Atmospheric</span><span class="o">.</span><span class="n">ozone</span><span class="p">(</span><span class="n">geom</span><span class="p">,</span> <span class="n">date</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+        <span class="n">aot</span> <span class="o">=</span> <span class="n">Atmospheric</span><span class="o">.</span><span class="n">aerosol</span><span class="p">(</span><span class="n">geom</span><span class="p">,</span> <span class="n">date</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+        <span class="c1"># add this information to the info dictionary as this metadata could</span>
+        <span class="c1"># be of interest afterwards</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;WATER_VAPOUR&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">h2o</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;OZONE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">o3</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;AOT&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">aot</span>
+        <span class="c1"># get the average altitude of the region to be processed</span>
+        <span class="c1"># for the Digital Elevation Model (DEM) the Shuttle Radar Topography</span>
+        <span class="c1"># Mission (SRTM) is used (Version 4) as it covers most parts of the</span>
+        <span class="c1"># Earth (90 arc-sec data is used)</span>
+        <span class="n">SRTM</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Image</span><span class="p">(</span><span class="s1">&#39;CGIAR/SRTM90_V4&#39;</span><span class="p">)</span>
+        <span class="n">alt</span> <span class="o">=</span> <span class="n">SRTM</span><span class="o">.</span><span class="n">reduceRegion</span><span class="p">(</span><span class="n">reducer</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Reducer</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span>
+                                <span class="n">geometry</span> <span class="o">=</span> <span class="n">geom</span><span class="o">.</span><span class="n">centroid</span><span class="p">())</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;elevation&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Atcorr-Metadata: Water-Vapor = </span><span class="si">{0}</span><span class="s2">, Ozone = </span><span class="si">{1}</span><span class="s2">, AOT = </span><span class="si">{2}</span><span class="s2">, &quot;</span>\
+                    <span class="s2">&quot; Average Altitude (m) = </span><span class="si">{3}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="n">h2o</span><span class="p">,</span> <span class="n">o3</span><span class="p">,</span> <span class="n">aot</span><span class="p">,</span> <span class="n">alt</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+        <span class="c1"># Py6S uses units of kilometers</span>
+        <span class="n">km</span> <span class="o">=</span> <span class="n">alt</span><span class="o">/</span><span class="mi">1000</span>
+        <span class="c1"># mask out clouds and cirrus from the imagery using the cloud score</span>
+        <span class="c1"># optionally</span>
+        <span class="c1"># algorithm provided by Sam Murhpy under Apache 2.0 licence</span>
+        <span class="c1"># see: https://github.com/samsammurphy/cloud-masking-sentinel2/blob/master/cloud-masking-sentinel2.ipynb</span>
+        <span class="c1"># also converts the image values to top-of-atmosphere reflectance</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Calculating cloud and shadow mask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">S2</span> <span class="o">=</span> <span class="n">mask_clouds</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">S2</span><span class="p">,</span> <span class="n">option</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Finished calculating cloud and shadow mask&#39;</span><span class="p">)</span>
+        <span class="c1"># create a 6S object from the Py6S class</span>
+        <span class="c1"># Instantiate (use the explizit path to installation directory of the</span>
+        <span class="c1"># 6S binary as otherwise there might be an error)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">SixS</span><span class="p">()</span>
+        <span class="c1"># Atmospheric constituents</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">atmos_profile</span> <span class="o">=</span> <span class="n">AtmosProfile</span><span class="o">.</span><span class="n">UserWaterAndOzone</span><span class="p">(</span><span class="n">h2o</span><span class="p">,</span><span class="n">o3</span><span class="p">)</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">aero_profile</span> <span class="o">=</span> <span class="n">AeroProfile</span><span class="o">.</span><span class="n">Continental</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">aot550</span> <span class="o">=</span> <span class="n">aot</span>
+        <span class="c1"># Earth-Sun-satellite geometry</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">geometry</span> <span class="o">=</span> <span class="n">Geometry</span><span class="o">.</span><span class="n">User</span><span class="p">()</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">view_z</span> <span class="o">=</span> <span class="mi">0</span>                       <span class="c1"># always NADIR (simplification!)</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">solar_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solar_z</span>         <span class="c1"># solar zenith angle</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">month</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scene_date</span><span class="o">.</span><span class="n">month</span>  <span class="c1"># month and day used for Earth-Sun distance</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">day</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scene_date</span><span class="o">.</span><span class="n">day</span>      <span class="c1"># month and day used for Earth-Sun distance</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">altitudes</span><span class="o">.</span><span class="n">set_sensor_satellite_level</span><span class="p">()</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">altitudes</span><span class="o">.</span><span class="n">set_target_custom_altitude</span><span class="p">(</span><span class="n">km</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Starting processing of Sentinel-2 scene!&#39;</span><span class="p">)</span>
+        <span class="c1"># now iterate over the nine relevant Sentinel-2 bands to perform the</span>
+        <span class="c1"># atmospheric correction and get the surface reflectance</span>
+        <span class="c1"># go through the spectral bands</span>
+        <span class="n">B2_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B2&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 2!&#39;</span><span class="p">)</span>
+        <span class="n">B3_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B3&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 3!&#39;</span><span class="p">)</span>
+        <span class="n">B4_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B4&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 4!&#39;</span><span class="p">)</span>
+        <span class="n">B5_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B5&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 5!&#39;</span><span class="p">)</span>
+        <span class="n">B6_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B6&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 6!&#39;</span><span class="p">)</span>
+        <span class="n">B7_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B7&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 7!&#39;</span><span class="p">)</span>
+        <span class="n">B8A_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B8A&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 8A!&#39;</span><span class="p">)</span>
+        <span class="n">B11_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B11&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 11!&#39;</span><span class="p">)</span>
+        <span class="n">B12_surf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface_reflectance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;B12&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing Sentinel-2 Band 12!&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;6S: Finished processing of Sentinel-2 scene!&#39;</span><span class="p">)</span>
+        <span class="c1"># make a stack of the spectral bands</span>
+        <span class="c1"># also add the computed cloud and shadow mask</span>
+        <span class="n">cm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">S2</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;CloudMask&#39;</span><span class="p">)</span>
+        <span class="n">sm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">S2</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;ShadowMask&#39;</span><span class="p">)</span>
+        <span class="n">S2_surf</span> <span class="o">=</span> <span class="n">B2_surf</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B3_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B4_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B5_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B6_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B7_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B8A_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B11_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">B12_surf</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">cm</span><span class="p">)</span><span class="o">.</span><span class="n">addBands</span><span class="p">(</span><span class="n">sm</span><span class="p">)</span>
+
+        <span class="c1"># return the surface reflectance image</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">S2_surf</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

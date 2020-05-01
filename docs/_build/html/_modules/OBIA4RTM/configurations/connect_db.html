@@ -1,0 +1,176 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.configurations.connect_db &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.configurations.connect_db</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Sat Jul 13 09:44:14 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">configparser</span> <span class="kn">import</span> <span class="n">ConfigParser</span>
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+
+<div class="viewcode-block" id="connect_db"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.configurations.connect_db.connect_db">[docs]</a><span class="k">def</span> <span class="nf">connect_db</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    connect to PostgreSQL database by using the specifications</span>
+<span class="sd">    in &#39;postgres.ini&#39; File in the root of the OBIA4RTM home directory</span>
+<span class="sd">    stored in the user-profile</span>
+<span class="sd">    </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    conn : psycopg2 Database connection</span>
+<span class="sd">        connection object to PostgreSQL database</span>
+<span class="sd">    cursor psycopg2 Database cursor</span>
+<span class="sd">        cursor for querying and inserting data from and to PostgreSQL DB</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># read the connection parameters from config-file (see template postgres.ini)</span>
+        <span class="n">parser</span> <span class="o">=</span> <span class="n">ConfigParser</span><span class="p">()</span>
+        <span class="n">directory</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+        <span class="n">postgres_init</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;postgres.ini&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">postgres_init</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;postgres.ini konnte nicht gefunden werden!&#39;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">postgres_init</span><span class="p">)</span>
+        <span class="c1"># and store them in a string</span>
+        <span class="n">conn_str</span> <span class="o">=</span> <span class="s2">&quot;host=&#39;</span><span class="si">{}</span><span class="s2">&#39; dbname=&#39;</span><span class="si">{}</span><span class="s2">&#39; user=&#39;</span><span class="si">{}</span><span class="s2">&#39; password=&#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span> <span class="nb">format</span><span class="p">(</span>
+                <span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;POSTGRESQL&#39;</span><span class="p">,</span> <span class="s1">&#39;host&#39;</span><span class="p">),</span>
+                <span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;POSTGRESQL&#39;</span><span class="p">,</span> <span class="s1">&#39;dbname&#39;</span><span class="p">),</span>
+                <span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;POSTGRESQL&#39;</span><span class="p">,</span> <span class="s1">&#39;username&#39;</span><span class="p">),</span>
+                <span class="n">parser</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;POSTGRESQL&#39;</span><span class="p">,</span> <span class="s1">&#39;password&#39;</span><span class="p">)</span>
+                <span class="p">)</span>
+        <span class="c1"># open connection</span>
+        <span class="n">conn</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">conn_str</span><span class="p">)</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">DatabaseError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="nb">print</span> <span class="p">(</span><span class="s2">&quot;ERROR: Unable to connect to the database&quot;</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="p">(</span><span class="n">err</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># return conn und cursor objects</span>
+    <span class="k">return</span> <span class="n">conn</span><span class="p">,</span> <span class="n">cursor</span></div>
+
+
+<div class="viewcode-block" id="get_db_connection_details"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.configurations.connect_db.get_db_connection_details">[docs]</a><span class="k">def</span> <span class="nf">get_db_connection_details</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    reads and returns the postgres.ini connection details</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    -------</span>
+<span class="sd">    parser : ConfigParser Object</span>
+<span class="sd">        parsed database configurations from postgres.ini file</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># read the connection parameters from config-file (see template postgres.ini)</span>
+        <span class="n">parser</span> <span class="o">=</span> <span class="n">ConfigParser</span><span class="p">()</span>
+        <span class="n">directory</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+        <span class="n">postgres_init</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;postgres.ini&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">postgres_init</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;postgres.ini konnte nicht gefunden werden!&#39;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">postgres_init</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">IOError</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="nb">print</span> <span class="p">(</span><span class="s2">&quot;Reading from postgres.ini failed&quot;</span><span class="p">)</span>
+        <span class="nb">print</span> <span class="p">(</span><span class="n">err</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># return conn und cursor objects</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+<div class="viewcode-block" id="close_db_connection"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.configurations.connect_db.close_db_connection">[docs]</a><span class="k">def</span> <span class="nf">close_db_connection</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">cursor</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    closes an opened database connection</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    con : psycopg2 Database Connection</span>
+<span class="sd">        connection to be closed</span>
+<span class="sd">    cursor : psycopg2 Database Cursor</span>
+<span class="sd">        cursor to be closed</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># check if con is still a valid connection</span>
+    <span class="k">if</span> <span class="n">con</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># close first the cursor and then con</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

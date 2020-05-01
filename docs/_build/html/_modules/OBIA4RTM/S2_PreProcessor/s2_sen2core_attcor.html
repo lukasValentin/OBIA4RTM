@@ -1,0 +1,480 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Wed Jul 31 12:32:24 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+<span class="sd">It is part of the (optional) Sen2Core preprocessing wrapper addon that takes</span>
+<span class="sd">care about image preprocessing (i.e atmospheric correction) using Sen2Core</span>
+<span class="sd">software (see: http://step.esa.int/main/third-party-plugins-2/sen2cor/)</span>
+
+<span class="sd">NOTE: Sen2Core must be installed on your computer!</span>
+
+<span class="sd">NOTE: Windows users might have to add the GDAL binaries (they come with OSGEO)</span>
+<span class="sd">to their PATH variable</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">from</span> <span class="nn">zipfile</span> <span class="kn">import</span> <span class="n">ZipFile</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.logger</span> <span class="kn">import</span> <span class="n">get_logger</span><span class="p">,</span> <span class="n">close_logger</span>
+
+
+<span class="n">error_message</span> <span class="o">=</span> <span class="s1">&#39;Sen2Core preprocessing failed. Check log.&#39;</span>
+
+
+<div class="viewcode-block" id="check_sen2core_installation"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor.check_sen2core_installation">[docs]</a><span class="k">def</span> <span class="nf">check_sen2core_installation</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    check if Sen2Core is installed and can be used</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path : String</span>
+<span class="sd">        user-provided path to Sen2Core installation directory</span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    exists : Boolean</span>
+<span class="sd">        True, if directory exists and False if tests fail</span>
+<span class="sd">    cmd : String</span>
+<span class="sd">        command for testing if Sen2Core is working</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># check if the directory as such exists</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The system cannot find the specified path: &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">path</span><span class="p">))</span>
+        <span class="n">exists</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="c1"># check if L2A_Process command can be executed</span>
+    <span class="c1"># make distinction between Windows and Linux/ OS X (-&gt; posix)</span>
+    <span class="n">platform</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span>
+    <span class="k">if</span> <span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;posix&#39;</span><span class="p">:</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;bin&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;L2A_Process --help&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;L2A_Process.bat --help&#39;</span>
+    <span class="c1"># try to execute the command</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span>
+                           <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                           <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                           <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+    <span class="c1"># read the output of the stderr from the pipe</span>
+    <span class="n">stderr</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+    <span class="c1"># check if an error was produced</span>
+    <span class="k">if</span> <span class="n">stderr</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Sen2Core seems not be installed in the specified path!&#39;</span><span class="p">)</span>
+        <span class="n">exists</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="c1"># otherwise everything should work</span>
+    <span class="n">exists</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="n">exists</span><span class="p">,</span> <span class="n">cmd</span></div>
+
+
+<div class="viewcode-block" id="call_sen2core"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor.call_sen2core">[docs]</a><span class="k">def</span> <span class="nf">call_sen2core</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">,</span> <span class="n">zipped</span><span class="p">,</span> <span class="n">resolution</span><span class="p">,</span> <span class="n">path_sen2core</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    calls Sen2Core and runs it on a downloaded Sentinel 1C dataset to</span>
+<span class="sd">    convert it to Level 2A.</span>
+<span class="sd">    The output spatial resolution must be provided (10, 20 or 60 meters)</span>
+
+<span class="sd">    NOTE: If you have already L2 imagery then only run the gdal_merge wrapper</span>
+<span class="sd">    and to not use this function</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sentinel_data_dir : String</span>
+<span class="sd">        path to the directory that contains the Level-1C data. In case</span>
+<span class="sd">        the data is zipped (default when downloaded from Copernicus) specify</span>
+<span class="sd">        the file-path of the zip</span>
+<span class="sd">    zipped : Boolean</span>
+<span class="sd">        specifies if the directory with the Sat data is zipped</span>
+<span class="sd">    resolution : Integer</span>
+<span class="sd">        spatial resolution of the atmospherically corrected imagery</span>
+<span class="sd">        possible value: 10, 20, 60 meters</span>
+<span class="sd">    path_sen2core : String</span>
+<span class="sd">        directory containing Sen2Core software (top-most level; e.g.</span>
+<span class="sd">        /home/user/Sen2Core/). Must be the same directory as specified</span>
+<span class="sd">        during the Sen2Core installation process using the --target option</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sentinel_data_dir_l2</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># check inputs</span>
+    <span class="k">if</span> <span class="n">zipped</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: &#39;</span><span class="si">{}</span><span class="s2">&#39; does not exist!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sentinel_data_dir</span><span class="p">))</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: &#39;</span><span class="si">{}</span><span class="s2">&#39; does not exist!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sentinel_data_dir</span><span class="p">))</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># check specified spatial resolution of the result</span>
+    <span class="n">allowed_res</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">60</span><span class="p">]</span>  <span class="c1"># m</span>
+    <span class="k">if</span> <span class="n">resolution</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">allowed_res</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error: The specified spatial resolution of </span><span class="si">{0}</span><span class="s2"> is not allowed!</span><span class="se">\n</span><span class="s2">&quot;</span>\
+              <span class="s2">&quot;Must be one of </span><span class="si">{1}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">resolution</span><span class="p">,</span> <span class="n">allowed_res</span><span class="p">))</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># check if Sen2Core is installed and working</span>
+    <span class="n">runs</span><span class="p">,</span> <span class="n">cmd</span> <span class="o">=</span> <span class="n">check_sen2core_installation</span><span class="p">(</span><span class="n">path_sen2core</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">runs</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Error: Sen2Core seems not to work properly!&#39;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># after that, enable logging</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Setting up Sen2Core processing environment for processing &#39;</span>\
+                <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">))</span>
+    <span class="c1"># if the data is still zipped unzip</span>
+    <span class="k">if</span> <span class="n">zipped</span><span class="p">:</span>
+        <span class="c1"># extract the parent directory</span>
+        <span class="n">parent_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">)</span>
+        <span class="c1"># unzip</span>
+        <span class="n">zip_file</span> <span class="o">=</span> <span class="n">ZipFile</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">)</span>
+        <span class="n">zip_file</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">parent_dir</span><span class="p">)</span>
+        <span class="n">zip_file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="c1"># check if everything is OK</span>
+        <span class="c1"># new name of sentinel_data_dir is now without ending .zip</span>
+        <span class="n">sentinel_data_dir</span> <span class="o">=</span> <span class="n">sentinel_data_dir</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.zip&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="c1"># should be a directory</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Unpacking of Sentinel-2 data failed!&#39;</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Successfully extracted zipped data to </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">sentinel_data_dir</span><span class="p">))</span>
+    <span class="c1"># endif</span>
+    <span class="c1"># now the data is ready for Sen2Core</span>
+    <span class="c1"># create the command to run Sen2Core</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="n">cmd</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39; --help&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="n">cmd</span> <span class="o">+</span> <span class="s1">&#39; &#39;</span> <span class="o">+</span> <span class="n">sentinel_data_dir</span> <span class="o">+</span> <span class="s1">&#39; --resolution=&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">resolution</span><span class="p">)</span>
+    <span class="c1"># call Sen2Core</span>
+    <span class="c1"># try to execute the command</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Starting Sen2Core processing&#39;</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span>
+                           <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                           <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                           <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="c1"># read the communication of the process</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+    <span class="n">stdout</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+    <span class="n">stderr</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+    <span class="c1"># write output to file</span>
+    <span class="c1"># determine the filename</span>
+    <span class="n">sub_pos</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="n">sentinel_data_dir</span><span class="p">)]</span>
+    <span class="n">fname</span> <span class="o">=</span> <span class="n">sentinel_data_dir</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">sub_pos</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+
+    <span class="c1"># parent directory</span>
+    <span class="n">parent_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">)</span>
+    <span class="c1"># save output of Sen2Core</span>
+    <span class="n">sen2core_stderr</span> <span class="o">=</span> <span class="n">parent_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Sen2Core_&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.stdout&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">sen2core_stderr</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">writelines</span><span class="p">(</span><span class="n">stdout</span><span class="p">)</span>
+
+    <span class="n">sen2core_stdout</span> <span class="o">=</span> <span class="n">parent_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;Sen2Core_&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.stderr&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">sen2core_stdout</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">stderr</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+            <span class="n">stderr</span> <span class="o">=</span> <span class="s1">&#39;Sen2Core terminated without errors&#39;</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">writelines</span><span class="p">(</span><span class="n">stderr</span><span class="p">)</span>
+
+    <span class="c1"># determine the dir-name of the processed data</span>
+    <span class="n">fname</span> <span class="o">=</span> <span class="n">fname</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;MSIL1C&#39;</span><span class="p">,</span> <span class="s1">&#39;MSIL2A&#39;</span><span class="p">)</span>
+    <span class="c1"># get list of all directories</span>
+    <span class="n">list_dirs</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">parent_dir</span><span class="p">)</span>
+    <span class="c1"># directory of the L2 data</span>
+    <span class="n">sentinel_data_dir_l2</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="n">list_dirs</span><span class="p">:</span>
+        <span class="n">sub_pos</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)]</span>
+        <span class="n">fname_act</span> <span class="o">=</span> <span class="n">parent_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">directory</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">sub_pos</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="n">fname_act</span> <span class="o">==</span> <span class="n">fname</span><span class="p">:</span>
+            <span class="n">sentinel_data_dir_l2</span> <span class="o">=</span> <span class="n">parent_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">directory</span>
+            <span class="k">break</span>
+    <span class="k">if</span> <span class="n">sentinel_data_dir_l2</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Seems as if Sen2Core failed. Check </span><span class="si">{}</span><span class="s1"> for more info.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">sen2core_stdout</span><span class="p">))</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Success - Processed data is in &#39;</span><span class="si">{0}</span><span class="s2">. See also </span><span class="si">{1}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">sentinel_data_dir_l2</span><span class="p">,</span>
+            <span class="n">sen2core_stdout</span><span class="p">))</span>
+    <span class="c1"># delete the L1C directory in case the data was available as zip to</span>
+    <span class="c1"># save disk storage</span>
+    <span class="k">if</span> <span class="n">zipped</span><span class="p">:</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sentinel_data_dir_l2</span></div>
+
+
+<div class="viewcode-block" id="call_gdal_merge"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor.call_gdal_merge">[docs]</a><span class="k">def</span> <span class="nf">call_gdal_merge</span><span class="p">(</span><span class="n">sentinel_data_dir_l2</span><span class="p">,</span> <span class="n">resolution</span><span class="p">,</span> <span class="n">storage_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    calls the gdal_merge.py script to make an image layer stack and prepare</span>
+<span class="sd">    the imagery for usage in OBIA4RTM.</span>
+<span class="sd">    Outputs a GeoTiff with the nine Sentinel-2 bands used in OBIA4RTM</span>
+<span class="sd">    and the SCL band that contains the preclassification information.</span>
+
+<span class="sd">    You can use this function also if you L2 data</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sentinel_data_dir_l2 : String</span>
+<span class="sd">        path of the directory containing the output of sen2core in L2 level</span>
+<span class="sd">    resolution : Integer</span>
+<span class="sd">        spatial resolution of the atmospherically corrected imagery</span>
+<span class="sd">        possible value: 10, 20, 60 meters</span>
+<span class="sd">    storage_dir : String</span>
+<span class="sd">        path to the directory the layer stack should be moved to. If None,</span>
+<span class="sd">        the layer stack will remain the sentinel_data_dir_l2 in the img folder</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    fname_stack : String</span>
+<span class="sd">        file-path to the stacked imagery</span>
+<span class="sd">    metadata_xml : String</span>
+<span class="sd">        file-path to the metadata xml file</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># enable logging</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">()</span>
+    <span class="c1"># check inputs</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">sentinel_data_dir_l2</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error: &#39;</span><span class="si">{}</span><span class="s2">&#39; does not exist!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">sentinel_data_dir_l2</span><span class="p">))</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+    <span class="c1"># resolution</span>
+    <span class="n">allowed_res</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">60</span><span class="p">]</span>  <span class="c1"># m</span>
+    <span class="k">if</span> <span class="n">resolution</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">allowed_res</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error: The specified spatial resolution of </span><span class="si">{0}</span><span class="s2"> is not allowed! &quot;</span>\
+              <span class="s2">&quot;Must be one of </span><span class="si">{1}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">resolution</span><span class="p">,</span> <span class="n">allowed_res</span><span class="p">))</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+    <span class="c1"># storage directory</span>
+    <span class="k">if</span> <span class="n">storage_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">storage_dir</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">storage_dir</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">PermissionError</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not create directory &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">sentinel_data_dir_l2</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Formatting sen2core output for OBIA4RTM&#39;</span><span class="p">)</span>
+    <span class="c1"># change to the sentinel_data_dir_l2 to avoid endless path names</span>
+    <span class="c1"># jump directly into the &#39;Granule directory&#39;</span>
+    <span class="n">sentinel_data_dir_l2</span> <span class="o">=</span> <span class="n">sentinel_data_dir_l2</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;GRANULE&#39;</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">sentinel_data_dir_l2</span><span class="p">)</span>
+    <span class="c1"># path to the image bands</span>
+    <span class="n">next_subdir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="c1"># now the full path can be constructed</span>
+    <span class="n">sentinel_data_dir_l2</span> <span class="o">+=</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">next_subdir</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">sentinel_data_dir_l2</span><span class="p">)</span>
+    <span class="c1"># check if the MTD_TL.xml metadata file can be found</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s1">&#39;MTD_TL.xml&#39;</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;No metadata-xml file could be found!&#39;</span><span class="p">)</span>
+        <span class="n">metadata_xml</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">metadata_xml</span> <span class="o">=</span> <span class="n">sentinel_data_dir_l2</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;MTD_TL.xml&#39;</span>
+
+    <span class="n">sentinel_data_dir_l2</span> <span class="o">+=</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;IMG_DATA&#39;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;R&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">resolution</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;m&#39;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">sentinel_data_dir_l2</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Could not find </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sentinel_data_dir_l2</span><span class="p">),</span>
+                     <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+    <span class="c1"># get the jp2 files containing the single bands and the SCL information</span>
+    <span class="n">band_files</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">()</span>
+    <span class="n">band_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;B02&#39;</span><span class="p">,</span> <span class="s1">&#39;B03&#39;</span><span class="p">,</span> <span class="s1">&#39;B04&#39;</span><span class="p">,</span> <span class="s1">&#39;B05&#39;</span><span class="p">,</span> <span class="s1">&#39;B06&#39;</span><span class="p">,</span> <span class="s1">&#39;B07&#39;</span><span class="p">,</span> <span class="s1">&#39;B8A&#39;</span><span class="p">,</span> <span class="s1">&#39;B11&#39;</span><span class="p">,</span> <span class="s1">&#39;B12&#39;</span><span class="p">,</span> <span class="s1">&#39;SCL&#39;</span><span class="p">]</span>
+    <span class="n">stack_files</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># loop over the filenames to find the important ones</span>
+    <span class="k">for</span> <span class="n">band_file</span> <span class="ow">in</span> <span class="n">band_files</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">band_name</span> <span class="ow">in</span> <span class="n">band_names</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">band_file</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">band_name</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="n">stack_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">band_file</span><span class="p">)</span>
+                <span class="k">break</span>
+    <span class="c1"># now the list must be sorted to bring the bands in the correct order</span>
+    <span class="n">stack_files</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="c1"># check if 10 bands were found</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">stack_files</span><span class="p">)</span> <span class="o">==</span> <span class="mi">10</span>
+    <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Expected 10 bands got </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">stack_files</span><span class="p">)),</span>
+                     <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+    <span class="c1"># convert list to string</span>
+    <span class="n">stack_files</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">stack_files</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;[&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;]&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">)</span>
+    <span class="c1"># make name of stacked layer file</span>
+    <span class="n">sub_pos</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="n">band_files</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span>
+    <span class="n">prefix</span> <span class="o">=</span> <span class="n">band_files</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">:</span><span class="n">sub_pos</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+    <span class="n">fname_stack</span> <span class="o">=</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s1">&#39;_merged.tiff&#39;</span>
+    <span class="c1"># now everything is ready for running the gdal_merge.py script</span>
+    <span class="c1"># output is GTiff and not Jpeg2000 as there are still some driver problems</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="s1">&#39;gdal_merge.py -of GTiff -separate &#39;</span> <span class="o">+</span> <span class="n">stack_files</span> <span class="o">+</span> <span class="s1">&#39; -o &#39;</span> <span class="o">+</span> <span class="n">fname_stack</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Running </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cmd</span><span class="p">))</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span>
+                           <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                           <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                           <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+    <span class="n">stderr</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+    <span class="c1"># check if the command worked</span>
+    <span class="k">if</span> <span class="n">stderr</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;gdal_merge failed: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">stderr</span><span class="p">))</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Successfully stacked Sentinel-2 bands (</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fname_stack</span><span class="p">))</span>
+    <span class="c1"># give the full path</span>
+    <span class="n">fname_stack_short</span> <span class="o">=</span> <span class="n">fname_stack</span>
+    <span class="n">fname_stack</span> <span class="o">=</span> <span class="n">sentinel_data_dir_l2</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">fname_stack</span>
+    <span class="c1"># in case an alternative directory was specified move the metadate file and</span>
+    <span class="c1"># the stacked layer file to this directory</span>
+    <span class="k">if</span> <span class="n">storage_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># rename the metadata-file and copy it to the storage drive</span>
+        <span class="n">copy</span> <span class="o">=</span> <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">metadata_xml</span><span class="p">,</span> <span class="n">storage_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s1">&#39;_MTD_TL.xml&#39;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">copy</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span>
+            <span class="k">assert</span> <span class="n">copy</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Copying of metafile failed!&#39;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+        <span class="c1"># move the stacked image</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">fname_stack</span><span class="p">,</span> <span class="n">storage_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">fname_stack_short</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Moved the imagery and the metadata xml to &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">storage_dir</span><span class="p">))</span>
+    <span class="c1"># close the logger</span>
+    <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+    <span class="c1"># return the file-paths of the imagery and the metadata</span>
+    <span class="k">return</span> <span class="n">fname_stack</span><span class="p">,</span> <span class="n">metadata_xml</span></div>
+
+
+<div class="viewcode-block" id="do_sen2core_preprocessing"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor.do_sen2core_preprocessing">[docs]</a><span class="k">def</span> <span class="nf">do_sen2core_preprocessing</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">,</span> <span class="n">zipped</span><span class="p">,</span> <span class="n">resolution</span><span class="p">,</span> <span class="n">path_sen2core</span><span class="p">,</span>
+                              <span class="n">storage_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    calls the sen2core wrapper and the gdal_merge wrapper to carry out the</span>
+<span class="sd">    atmospheric correction and preclassification on Sentinel-1 imagery</span>
+<span class="sd">    (L1C level) required for OBIA4RTM.</span>
+
+<span class="sd">    NOTE: If you have already L2 imagery then only run the gdal_merge wrapper</span>
+<span class="sd">    and to not use this function</span>
+<span class="sd">    Make also sure that gdal_merge can be executed from the command line.</span>
+
+<span class="sd">    NOTE: Windows users might have add the gdal binaries to their PATH!!</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sentinel_data_dir : String</span>
+<span class="sd">        path to the directory that contains the Level-1C data. In case</span>
+<span class="sd">        the data is zipped (default when downloaded from Copernicus) specify</span>
+<span class="sd">        the file-path of the zip</span>
+<span class="sd">    zipped : Boolean</span>
+<span class="sd">        specifies if the directory with the Sat data is zipped</span>
+<span class="sd">    resolution : Integer</span>
+<span class="sd">        spatial resolution of the atmospherically corrected imagery</span>
+<span class="sd">        possible value: 10, 20, 60 meters</span>
+<span class="sd">    path_sen2core : String</span>
+<span class="sd">        directory containing Sen2Core software (top-most level; e.g.</span>
+<span class="sd">        /home/user/Sen2Core/). Must be the same directory as specified</span>
+<span class="sd">        during the Sen2Core installation process using the --target option</span>
+<span class="sd">    storage_dir : String</span>
+<span class="sd">        path to the directory the final layer stack should be moved to. If None,</span>
+<span class="sd">        the layer stack will remain the sentinel_data_dir_l2 in the img folder</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    fname_stack : String</span>
+<span class="sd">        file-path to the stacked imagery (required in OBIA4RTM)</span>
+<span class="sd">    metadata_xml : String</span>
+<span class="sd">        file-path to the metadata xml file (required in OBIA4RTM)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># run sen2core for atmospheric correction and preclass</span>
+    <span class="n">sentinel_data_dir_l2</span> <span class="o">=</span> <span class="n">call_sen2core</span><span class="p">(</span><span class="n">sentinel_data_dir</span><span class="p">,</span>
+                                         <span class="n">zipped</span><span class="p">,</span>
+                                         <span class="n">resolution</span><span class="p">,</span>
+                                         <span class="n">path_sen2core</span><span class="p">)</span>
+    <span class="c1"># make image stack and identify metadata xml file</span>
+    <span class="n">fname_stack</span><span class="p">,</span> <span class="n">metadata_xml</span> <span class="o">=</span> <span class="n">call_gdal_merge</span><span class="p">(</span><span class="n">sentinel_data_dir_l2</span><span class="p">,</span>
+                                              <span class="n">resolution</span><span class="p">,</span>
+                                              <span class="n">storage_dir</span><span class="o">=</span><span class="n">storage_dir</span><span class="p">)</span>
+    <span class="c1"># return image stack file-path and metadata file path</span>
+    <span class="c1"># -&gt; now the data can be used in OBIA4RTM</span>
+    <span class="k">return</span> <span class="n">fname_stack</span><span class="p">,</span> <span class="n">metadata_xml</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

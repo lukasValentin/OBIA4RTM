@@ -1,0 +1,378 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.zonal_stats.get_mean_refl_ee &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.zonal_stats.get_mean_refl_ee</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Tue Jul 30 08:29:42 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM. It is part of the optional Google-Earth-Engine</span>
+<span class="sd">extension and extends the file-based get_mean_refl.py script to an according</span>
+<span class="sd">GEE version.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">ast</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">ee</span>
+<span class="kn">from</span> <span class="nn">osgeo</span> <span class="kn">import</span> <span class="n">ogr</span><span class="p">,</span> <span class="n">osr</span>
+<span class="kn">from</span> <span class="nn">psycopg2</span> <span class="kn">import</span> <span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.connect_db</span> <span class="kn">import</span> <span class="n">connect_db</span><span class="p">,</span> <span class="n">close_db_connection</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.logger</span> <span class="kn">import</span> <span class="n">get_logger</span><span class="p">,</span> <span class="n">close_logger</span>
+
+
+<div class="viewcode-block" id="transform_utm_to_wgs84"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.zonal_stats.get_mean_refl_ee.transform_utm_to_wgs84">[docs]</a><span class="k">def</span> <span class="nf">transform_utm_to_wgs84</span><span class="p">(</span><span class="n">easting</span><span class="p">,</span> <span class="n">northing</span><span class="p">,</span> <span class="n">zone</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    converts UTM easting, northing to lon, lat</span>
+<span class="sd">    found on: </span>
+<span class="sd">    https://stackoverflow.com/questions/343865/how-to-convert-from-utm-to-latlng-in-python-or-javascript</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    easting : Float</span>
+<span class="sd">        UTM-Easting (m)</span>
+<span class="sd">    northing : Float</span>
+<span class="sd">        UTM-Northing (m)</span>
+<span class="sd">    zone : Integer</span>
+<span class="sd">        UTM-Zone number</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    lon : Float</span>
+<span class="sd">        Longitude (deg)</span>
+<span class="sd">    lat : Float</span>
+<span class="sd">        Latitude (deg)</span>
+<span class="sd">    alt : Float</span>
+<span class="sd">        Altitude (m)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">utm_coordinate_system</span> <span class="o">=</span> <span class="n">osr</span><span class="o">.</span><span class="n">SpatialReference</span><span class="p">()</span>
+    <span class="c1"># Set geographic coordinate system to handle lat/lon</span>
+    <span class="n">utm_coordinate_system</span><span class="o">.</span><span class="n">SetWellKnownGeogCS</span><span class="p">(</span><span class="s2">&quot;WGS84&quot;</span><span class="p">)</span>
+    <span class="c1"># check hemisphere</span>
+    <span class="n">is_northern</span> <span class="o">=</span> <span class="n">northing</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="n">utm_coordinate_system</span><span class="o">.</span><span class="n">SetUTM</span><span class="p">(</span><span class="n">zone</span><span class="p">,</span> <span class="n">is_northern</span><span class="p">)</span>
+    <span class="c1"># Clone ONLY the geographic coordinate system</span>
+    <span class="n">wgs84_coordinate_system</span> <span class="o">=</span> <span class="n">utm_coordinate_system</span><span class="o">.</span><span class="n">CloneGeogCS</span><span class="p">()</span> 
+    <span class="c1"># create transform component</span>
+    <span class="n">utm_to_wgs84_transform</span> <span class="o">=</span> <span class="n">osr</span><span class="o">.</span><span class="n">CoordinateTransformation</span><span class="p">(</span><span class="n">utm_coordinate_system</span><span class="p">,</span>
+                                                          <span class="n">wgs84_coordinate_system</span><span class="p">)</span>
+    <span class="c1"># returns lon, lat, altitude</span>
+    <span class="k">return</span> <span class="n">utm_to_wgs84_transform</span><span class="o">.</span><span class="n">TransformPoint</span><span class="p">(</span><span class="n">easting</span><span class="p">,</span> <span class="n">northing</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_mean_refl_ee"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.zonal_stats.get_mean_refl_ee.get_mean_refl_ee">[docs]</a><span class="k">def</span> <span class="nf">get_mean_refl_ee</span><span class="p">(</span><span class="n">shp_file</span><span class="p">,</span> <span class="n">img</span><span class="p">,</span> <span class="n">acqui_date</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">,</span> <span class="n">table_name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    calculates mean reflectance per object in image. Uses GEE-Python bindings</span>
+<span class="sd">    for reading the shape and Sentinel-2 imagery data.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    shp_file : String</span>
+<span class="sd">        file-path to ESRI shapefile with the image object boundaries</span>
+<span class="sd">    img : ee.image.Image</span>
+<span class="sd">        GEE imagery containing the atmospherically collected Sentinel-2 data</span>
+<span class="sd">    acqui_date : String</span>
+<span class="sd">        acquisition date of the imagery (used for linking to LUT and metadata)</span>
+<span class="sd">    scene_id : String</span>
+<span class="sd">        ID of the Sentinel-2 scene</span>
+<span class="sd">    table_name : String</span>
+<span class="sd">        Name of the table the object reflectance values should be written to</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># open the database connection to OBIA4RTM&#39;s backend</span>
+    <span class="n">conn</span><span class="p">,</span> <span class="n">cursor</span> <span class="o">=</span> <span class="n">connect_db</span><span class="p">()</span>
+    <span class="c1"># get a logger</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">()</span>
+    <span class="c1"># in case it isn&#39;t done yet:</span>
+    <span class="n">ee</span><span class="o">.</span><span class="n">Initialize</span><span class="p">()</span>
+    
+    <span class="c1"># iterate over the shapefile to get the metadata</span>
+    <span class="c1"># Shapefile handling</span>
+    <span class="n">driver</span> <span class="o">=</span> <span class="n">ogr</span><span class="o">.</span><span class="n">GetDriverByName</span><span class="p">(</span><span class="s1">&#39;ESRI Shapefile&#39;</span><span class="p">)</span>
+    <span class="n">shpfile</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">Open</span><span class="p">(</span><span class="n">shp_file</span><span class="p">)</span>
+    <span class="c1"># check if shapefile exists and could be opened</span>
+    <span class="k">if</span> <span class="n">shpfile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;The provided File &#39;</span><span class="si">{}</span><span class="s2">&#39; is invalid or blocked!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">shp_file</span><span class="p">))</span>
+    <span class="n">layer</span> <span class="o">=</span> <span class="n">shpfile</span><span class="o">.</span><span class="n">GetLayer</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">num_objects</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">GetFeatureCount</span><span class="p">()</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{0}</span><span class="s2"> image objects will be processed. This might take a while...&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">num_objects</span><span class="p">))</span>
+    
+    <span class="c1"># loop over single features</span>
+    <span class="c1"># get geometry of features and their ID as well as mean reflectane per band</span>
+
+    <span class="c1"># before that check the raster metadata from GEE</span>
+    <span class="n">img_epsg</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;B2&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">projection</span><span class="p">()</span><span class="o">.</span><span class="n">crs</span><span class="p">()</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+    <span class="n">img_epsg</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">img_epsg</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="c1"># check with the epsg of the shapefile</span>
+    <span class="n">ref</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">GetSpatialRef</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">ref</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;The layer has no projection info! Assume it is the same&#39;</span>\
+                       <span class="s1">&#39;as for the imagery - but check results!&#39;</span><span class="p">)</span>
+        <span class="n">shp_epsg</span> <span class="o">=</span> <span class="n">img_epsg</span>
+        <span class="c1"># asuming that the imagery is projected in UTM as it should</span>
+        <span class="c1"># the UTM-Zone is stored in the last two digits</span>
+        <span class="n">utm</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">shp_epsg</span><span class="p">)[</span><span class="mi">3</span><span class="p">::])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="n">ref</span><span class="o">.</span><span class="n">GetAuthorityCode</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">shp_epsg</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+        <span class="n">utm</span> <span class="o">=</span> <span class="n">ref</span><span class="o">.</span><span class="n">GetUTMZone</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">img_epsg</span> <span class="o">!=</span> <span class="n">shp_epsg</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;The projection of the imagery does not match the projection &#39;</span>\
+                     <span class="s1">&#39;of the shapefile you provided!&#39;</span>\
+                     <span class="s1">&#39;EPSG-Code of the Image: EPSG:</span><span class="si">{0}</span><span class="s1">; &#39;</span>\
+                     <span class="s1">&#39;EPSG-Code of the Shapefile: EPSG:</span><span class="si">{1}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                             <span class="n">img_epsg</span><span class="p">,</span>
+                             <span class="n">shp_epsg</span><span class="p">))</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s1">&#39;An error occured while execute get_mean_refl. Check logfile!&#39;</span><span class="p">)</span>
+    <span class="c1"># determine the min area of an object (determined by S2 spatial resolution)</span>
+    <span class="c1"># use the &quot;standard&quot; resolution of 20 meters</span>
+    <span class="c1"># an object must be twice times larger</span>
+    <span class="n">min_area</span> <span class="o">=</span> <span class="mi">20</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">2</span>
+
+    <span class="c1"># for requesting the landuse information</span>
+    <span class="n">luc_field</span> <span class="o">=</span> <span class="s1">&#39;LU&#39;</span> <span class="o">+</span> <span class="n">acqui_date</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="c1"># start iterating over features</span>
+    <span class="c1"># Get geometry and extent of feature </span>
+    <span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_objects</span><span class="p">):</span>
+        <span class="n">feature</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">GetFeature</span><span class="p">(</span><span class="n">ii</span><span class="p">)</span>
+        <span class="c1"># extract the geometry</span>
+        <span class="n">geom</span> <span class="o">=</span> <span class="n">feature</span><span class="o">.</span><span class="n">GetGeometryRef</span><span class="p">()</span>
+        <span class="c1"># get a well-know text representation -&gt; required by PostGIS</span>
+        <span class="n">wkt</span> <span class="o">=</span> <span class="n">geom</span><span class="o">.</span><span class="n">ExportToWkt</span><span class="p">()</span>
+        <span class="c1"># get the ID</span>
+        <span class="c1"># f_id = feature.GetFID() # depraceted</span>
+        <span class="n">f_id</span> <span class="o">=</span> <span class="n">feature</span><span class="o">.</span><span class="n">GetField</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">)</span>
+        <span class="c1"># get the land cover code</span>
+        <span class="n">luc</span> <span class="o">=</span> <span class="n">feature</span><span class="o">.</span><span class="n">GetField</span><span class="p">(</span><span class="n">luc_field</span><span class="p">)</span>
+        <span class="c1"># convert to integer coding if luc is provided as text</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">luc</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">luc</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">luc</span> <span class="o">=</span> <span class="n">luc</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT landuse FROM public.s2_landuse WHERE landuse_semantic = &quot;</span>\
+            <span class="s2">&quot;&#39;</span><span class="si">{0}</span><span class="s2">&#39;;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">luc</span><span class="p">)</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+            <span class="n">luc</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+        <span class="c1"># end try-except</span>
+        <span class="c1"># get the area of the feature and check if it fits the image</span>
+        <span class="c1"># resolution -&gt; if the object is to small skip it</span>
+        <span class="n">area</span> <span class="o">=</span> <span class="n">geom</span><span class="o">.</span><span class="n">Area</span><span class="p">()</span>  <span class="c1"># m2</span>
+        <span class="c1"># the area must be at least 2.5 times larger than the coarsest</span>
+        <span class="c1"># possible spatial resolution of Sentinel-2 (60 by 60 meters)</span>
+        <span class="k">if</span> <span class="n">area</span> <span class="o">&lt;</span> <span class="n">min_area</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;The object </span><span class="si">{0}</span><span class="s1"> was too small compared to the &#39;</span>\
+                           <span class="s1">&#39;spatial resolution of Sentinel-2! &#39;</span>\
+                           <span class="s1">&#39;Object area (m2): </span><span class="si">{1}</span><span class="s1">; Minimum area required (m2): &#39;</span>\
+                           <span class="s1">&#39;</span><span class="si">{2}</span><span class="s1"> -&gt; skipping&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                   <span class="n">f_id</span><span class="p">,</span>
+                                   <span class="n">area</span><span class="p">,</span>
+                                   <span class="n">min_area</span><span class="p">))</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># export the coordinates of the geometry temporarily to JSON dictionary</span>
+        <span class="c1"># for communicating with GEE</span>
+        <span class="n">geom_json</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">geom</span><span class="o">.</span><span class="n">ExportToJson</span><span class="p">())</span>
+        <span class="c1"># get the geometry type</span>
+        <span class="c1"># allowed values: Polygon and Multipolygon</span>
+        <span class="n">geom_type</span> <span class="o">=</span> <span class="n">geom_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span>
+        <span class="c1"># get the coordinates</span>
+        <span class="n">geom_coords</span> <span class="o">=</span> <span class="n">geom_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;coordinates&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># must be converted to lon, lat for GEE</span>
+        <span class="n">geo_coords</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">geom_coord</span> <span class="ow">in</span> <span class="n">geom_coords</span><span class="p">:</span>
+            <span class="n">easting</span> <span class="o">=</span> <span class="n">geom_coord</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">northing</span> <span class="o">=</span> <span class="n">geom_coord</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="c1"># call transform method</span>
+            <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">alt</span> <span class="o">=</span> <span class="n">transform_utm_to_wgs84</span><span class="p">(</span><span class="n">easting</span><span class="p">,</span>
+                                                   <span class="n">northing</span><span class="p">,</span>
+                                                   <span class="n">utm</span><span class="p">)</span>
+            <span class="n">geo_coord</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">geo_coord</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span>
+            <span class="n">geo_coord</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span>
+            <span class="n">geo_coords</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">geo_coord</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">geom_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;Polygon&#39;</span><span class="p">,</span> <span class="s1">&#39;Multipolygon&#39;</span><span class="p">]:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Object with ID </span><span class="si">{}</span><span class="s1"> is not of type Polygon or &#39;</span>\
+                           <span class="s1">&#39;Multipolygon -&gt; skipping&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">f_id</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="c1"># construct a GEE geometry</span>
+        <span class="c1"># TODO -&gt; test what happens for Multipolygon!</span>
+        <span class="n">geom_gee</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">Geometry</span><span class="o">.</span><span class="n">Polygon</span><span class="p">(</span><span class="n">geo_coords</span><span class="p">)</span>
+
+        <span class="c1"># use the image reduce function to get the mean reflectance values</span>
+        <span class="c1"># for each of the nine bands used in GEE</span>
+        <span class="n">meanDictionary</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">reduceRegion</span><span class="p">(</span>
+                <span class="n">reducer</span> <span class="o">=</span> <span class="n">ee</span><span class="o">.</span><span class="n">Reducer</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span>
+                <span class="n">geometry</span> <span class="o">=</span> <span class="n">geom_gee</span>
+                <span class="p">)</span>
+
+        <span class="c1"># extract the computed mean values for the particular image</span>
+        <span class="c1"># only use those bands required for OBIA4RTM</span>
+        <span class="c1"># multiply with 100 to get % surface reflectance values</span>
+        <span class="n">multiplier</span> <span class="o">=</span> <span class="mi">100</span>
+        <span class="n">B2</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B2&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B3</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B3&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B4</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B4&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B5</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B5&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B6</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B6&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B7</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B7&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B8A</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B8A&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B11</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B11&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="n">B12</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;B12&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span> <span class="o">*</span> <span class="n">multiplier</span>
+        <span class="c1"># check cloud and shadow mask</span>
+        <span class="c1"># the cloud and shadow masks are binary</span>
+        <span class="c1"># if the average is zero everything is OK (=no clouds, no shadows)</span>
+        <span class="n">cm</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;CloudMask&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+        <span class="n">sm</span> <span class="o">=</span> <span class="n">meanDictionary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;ShadowMask&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getInfo</span><span class="p">()</span>
+        <span class="c1"># if the shadow and/ or the cloud mask is not zero on average</span>
+        <span class="c1"># -&gt; skip the object as it is cloud covered or affected by</span>
+        <span class="c1"># cloud shadows</span>
+        <span class="k">if</span> <span class="n">cm</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Object with ID </span><span class="si">{}</span><span class="s1"> is coverd by clouds -&gt; skipping&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">f_id</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">sm</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Object with ID </span><span class="si">{}</span><span class="s1"> is coverd by cloud shadows -&gt; skipping&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">f_id</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="c1"># also make sure that the object really contains reflectance values</span>
+        <span class="c1"># checking the first band should be sufficient</span>
+        <span class="k">if</span> <span class="n">B2</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Object with ID </span><span class="si">{}</span><span class="s1"> contains only NaN values -&gt; skipping&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">f_id</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="c1"># otherwise insert the data into the PostgreSQL database</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;INSERT INTO </span><span class="si">{0}</span><span class="s2"> (object_id, acquisition_date, landuse, object_geom, &quot;</span>\
+                    <span class="s2">&quot;b2, b3, b4, b5, b6, b7, b8a, b11, b12, scene_id) VALUES ( &quot;</span> \
+                    <span class="s2">&quot;</span><span class="si">{1}</span><span class="s2">, &#39;</span><span class="si">{2}</span><span class="s2">&#39;, </span><span class="si">{3}</span><span class="s2">, ST_Multi(ST_GeometryFromText(&#39;</span><span class="si">{4}</span><span class="s2">&#39;, </span><span class="si">{5}</span><span class="s2">)), &quot;</span> \
+                    <span class="s2">&quot;</span><span class="si">{6}</span><span class="s2">, </span><span class="si">{7}</span><span class="s2">, </span><span class="si">{8}</span><span class="s2">, </span><span class="si">{9}</span><span class="s2">, </span><span class="si">{10}</span><span class="s2">, </span><span class="si">{11}</span><span class="s2">, </span><span class="si">{12}</span><span class="s2">, </span><span class="si">{13}</span><span class="s2">, </span><span class="si">{14}</span><span class="s2">, &#39;</span><span class="si">{15}</span><span class="s2">&#39;) &quot;</span>\
+                    <span class="s2">&quot; ON CONFLICT (object_id, scene_id) DO NOTHING;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="n">table_name</span><span class="p">,</span>
+                            <span class="n">f_id</span><span class="p">,</span>
+                            <span class="n">acqui_date</span><span class="p">,</span>
+                            <span class="n">luc</span><span class="p">,</span>
+                            <span class="n">wkt</span><span class="p">,</span>
+                            <span class="n">img_epsg</span><span class="p">,</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B2</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B3</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B4</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B5</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B6</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B7</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B8A</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B11</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">B12</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+                            <span class="n">scene_id</span>
+                            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Invalid string syntax encountered when attempting&quot;</span>\
+                         <span class="s2">&quot; to generate INSERT for field </span><span class="si">{0}</span><span class="s2"> on &#39;</span><span class="si">{1}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                     <span class="n">f_id</span><span class="p">,</span> <span class="n">acqui_date</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="c1"># catch errors for single objects accordingly and continue with next</span>
+        <span class="c1"># object to avoid interrupts of whole workflow</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">DatabaseError</span><span class="p">,</span> <span class="n">ProgrammingError</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not insert image object with ID </span><span class="si">{0}</span><span class="s2"> into table &#39;</span><span class="si">{1}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">f_id</span><span class="p">,</span> <span class="n">table_name</span><span class="p">),</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="k">continue</span>
+    <span class="c1">#endfor</span>
+
+    <span class="c1"># close the GDAL-bindings to the files</span>
+    <span class="n">shpfile</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">layer</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># close database connection</span>
+    <span class="n">close_db_connection</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">cursor</span><span class="p">)</span>
+    <span class="c1"># close the logger</span>
+    <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

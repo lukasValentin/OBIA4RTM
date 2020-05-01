@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.configurations.db_management &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.configurations.db_management</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Tue Jul 30 15:38:37 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.connect_db</span> <span class="kn">import</span> <span class="n">connect_db</span><span class="p">,</span> <span class="n">close_db_connection</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.logger</span> <span class="kn">import</span> <span class="n">get_logger</span><span class="p">,</span> <span class="n">close_logger</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.inversion.handle_prosail_cfg</span> <span class="kn">import</span> <span class="n">get_landcover_classes</span>
+
+
+<div class="viewcode-block" id="update_luc_table"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.configurations.db_management.update_luc_table">[docs]</a><span class="k">def</span> <span class="nf">update_luc_table</span><span class="p">(</span><span class="n">landcover_table</span><span class="p">,</span> <span class="n">landcover_cfg</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    updates the land-cover/ land use table in OBIA4RTM that is required for</span>
+<span class="sd">    performing land-cover class specific vegetation parameter retrieval</span>
+<span class="sd">    Make sure that the classes in the config file match the land cover classes</span>
+<span class="sd">    provided for the image objects and used for generating the lookup-table.</span>
+<span class="sd">    Otherwise bad things might happen.</span>
+
+<span class="sd">    NOTE: in case land cover classes that are about to be inserted are already</span>
+<span class="sd">    stored in the table, they will be overwritten!</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    landcover_table : String</span>
+<span class="sd">        name of the table with the land cover information (&lt;schema.table&gt;)</span>
+<span class="sd">    landcover_cfg : String</span>
+<span class="sd">        file-path to land cover configurations file</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># open the logger</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">()</span>
+    <span class="c1"># if no other file is specified the default file from the OBIA4RTM</span>
+    <span class="c1"># directory in the user profile will be used (landcover.cfg)</span>
+    <span class="k">if</span> <span class="n">landcover_cfg</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># determine the directory the configuration files are located</span>
+        <span class="n">obia4rtm_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+        <span class="n">fname</span> <span class="o">=</span> <span class="n">obia4rtm_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;OBIA4RTM_HOME&#39;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">directory</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+        <span class="n">landcover_cfg</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;landcover.cfg&#39;</span>
+    <span class="c1"># check if specified file exists</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">landcover_cfg</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;The specified landcover.cfg cannot be found!&#39;</span><span class="p">,</span>
+                     <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s1">&#39;Error during inserting landcover information. Check log!&#39;</span><span class="p">)</span>
+    <span class="c1"># connect database</span>
+    <span class="n">con</span><span class="p">,</span> <span class="n">cursor</span> <span class="o">=</span> <span class="n">connect_db</span><span class="p">()</span>
+    <span class="c1"># read the landcover information</span>
+    <span class="n">luc_classes</span> <span class="o">=</span> <span class="n">get_landcover_classes</span><span class="p">(</span><span class="n">landcover_cfg</span><span class="p">)</span>
+    <span class="c1"># now read in the actual data</span>
+    <span class="n">n_classes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">luc_classes</span><span class="p">)</span>  <span class="c1"># number of land cover classes</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">n_classes</span> <span class="o">&gt;=</span> <span class="mi">1</span>
+    <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Error: &gt;=1 land cover class must be provided!&#39;</span><span class="p">,</span>
+                     <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s1">&#39;Error while reading the landcover.cfg file. Check log.&#39;</span><span class="p">)</span>
+    <span class="c1"># now, iterate through the lines of the cfg files and insert it into</span>
+    <span class="c1"># the Postgres database</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Try to insert values into table &#39;</span><span class="si">{0}</span><span class="s2">&#39; from landcover.cfg &quot;</span>\
+                <span class="s2">&quot;file (</span><span class="si">{1}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">landcover_table</span><span class="p">,</span>
+            <span class="n">landcover_cfg</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">luc_class</span> <span class="ow">in</span> <span class="n">luc_classes</span><span class="p">:</span>
+        <span class="c1"># the first item of the tuple must be an integer value</span>
+        <span class="c1"># the second one a string</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">luc_code</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">luc_class</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Landcover.cfg file seems to be corrupt. &#39;</span>\
+                         <span class="s1">&#39;Excepted integer for land cover code!&#39;</span><span class="p">,</span>
+                         <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s1">&#39;Error during inserting landcover.cfg. Check log!&#39;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">luc_desc</span> <span class="o">=</span> <span class="n">luc_class</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Landcover.cfg file seems to be corrupt. &#39;</span>\
+                         <span class="s1">&#39;Excepted string for land cover description!&#39;</span><span class="p">,</span>
+                         <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s1">&#39;Error during inserting landcover.cfg. Check log!&#39;</span><span class="p">)</span>
+        <span class="c1"># insert into database</span>
+        <span class="c1"># ON CONFLICT -&gt; old values will be replaced</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;INSERT INTO </span><span class="si">{0}</span><span class="s2"> (landuse, landuse_semantic) VALUES (</span><span class="si">{1}</span><span class="s2">,&#39;</span><span class="si">{2}</span><span class="s2">&#39;)&quot;</span>\
+            <span class="s2">&quot; ON CONFLICT (landuse) DO UPDATE SET landuse = </span><span class="si">{1}</span><span class="s2">,&quot;</span>\
+            <span class="s2">&quot; landuse_semantic = &#39;</span><span class="si">{2}</span><span class="s2">&#39;;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">landcover_table</span><span class="p">,</span>
+                    <span class="n">luc_code</span><span class="p">,</span>
+                    <span class="n">luc_desc</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+    <span class="c1"># close the logger and database connection afterwards</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Updated land cover information in table &#39;</span><span class="si">{}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">landcover_table</span><span class="p">))</span>
+    <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+    <span class="n">close_db_connection</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">cursor</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

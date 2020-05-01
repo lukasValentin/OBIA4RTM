@@ -1,0 +1,164 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.install &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.install</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Fri Jul 19 10:43:55 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">@author: Lukas Graf, graflukas@web.de</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">expanduser</span>
+<span class="kn">from</span> <span class="nn">shutil</span> <span class="kn">import</span> <span class="n">copyfile</span>
+<span class="kn">import</span> <span class="nn">OBIA4RTM</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.setup_db.setup_postgres</span> <span class="kn">import</span> <span class="n">setupDataBase</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.setup_db.create_schema</span> <span class="kn">import</span> <span class="n">create_schema</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.S2_PreProcessor.install_6S</span> <span class="kn">import</span> <span class="n">install_6S</span>
+
+
+<div class="viewcode-block" id="install"><a class="viewcode-back" href="../../index.html#OBIA4RTM.install.install">[docs]</a><span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="n">install_addons</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    does a full-installation of OBIA4RTM backend facilities including the</span>
+<span class="sd">    PostgreSQL database setup and copying of configuration files to a user-</span>
+<span class="sd">    accessible directory</span>
+<span class="sd">    NOTE: PostgreSQL must be almost installed as well as PostGIS</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    install_addons : Boolean</span>
+<span class="sd">        Def: False; if True 6S for atmospheric correction together with GEE will</span>
+<span class="sd">        be installed -&gt; please read the requirements before!</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># firstly, try to setup the Postgres database for the backend</span>
+    <span class="c1"># NOTE: PostgreSQL must be almost installed as well as PostGIS</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Start to run OBIA4RTM installation script!&#39;</span><span class="p">)</span>
+    <span class="n">setup</span> <span class="o">=</span> <span class="n">setupDataBase</span><span class="p">()</span>
+    <span class="n">setup</span><span class="o">.</span><span class="n">setup_backend</span><span class="p">()</span>
+    
+    <span class="c1"># now determine the location to which the configuration files should be</span>
+    <span class="c1"># copied to. This depends on the OS</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Setup OBIA4RTM directory with configuration files!&#39;</span><span class="p">)</span>
+    <span class="n">home</span> <span class="o">=</span> <span class="n">expanduser</span><span class="p">(</span><span class="s2">&quot;~&quot;</span><span class="p">)</span>
+    <span class="c1"># try to make a OBIA4RTM directory in the home directory of the current user</span>
+    <span class="n">obia4rtm_dir</span> <span class="o">=</span> <span class="n">home</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;OBIA4RTM&#39;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">obia4rtm_dir</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">PermissionError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to write to </span><span class="si">{}</span><span class="s1">. Please check permissions!&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">obia4rtm_dir</span><span class="p">))</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># do the same for the logging directory</span>
+    <span class="n">log_dir</span> <span class="o">=</span> <span class="n">obia4rtm_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;log&#39;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">log_dir</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">PermissionError</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Failed to write to </span><span class="si">{}</span><span class="s1">. Please check permissions!&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">log_dir</span><span class="p">))</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># note down the OBIA4RTM home dir</span>
+    <span class="n">OBIA4RTM_install_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">OBIA4RTM</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="n">fname</span> <span class="o">=</span> <span class="n">OBIA4RTM_install_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="s1">&#39;OBIA4RTM_HOME&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">obia4rtm_dir</span><span class="p">)</span>
+    <span class="c1"># after that, copy the configuration files to this directory</span>
+    <span class="c1"># these include the prosail.txt, obia4rtm_backened.cfg,</span>
+    <span class="c1"># postgres.ini and landcover.cfg file as well as soil_reflectance.txt</span>
+    <span class="n">files_to_be_copied</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;prosail.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;obia4rtm_backend.cfg&#39;</span><span class="p">,</span> <span class="s1">&#39;postgres.ini&#39;</span><span class="p">,</span> <span class="s1">&#39;landcover.cfg&#39;</span><span class="p">,</span> <span class="s1">&#39;soil_reflectance.txt&#39;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">files_to_be_copied</span><span class="p">:</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">OBIA4RTM_install_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">file</span>
+        <span class="n">dst</span> <span class="o">=</span> <span class="n">obia4rtm_dir</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span> <span class="o">+</span> <span class="n">file</span>
+        <span class="n">copyfile</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dst</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Base Setup of OBIA4RTM finished!&#39;</span><span class="p">)</span>
+    <span class="c1"># setup a new schema and the schema-specific tables of OBIA4RTM</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">create_schema</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">res</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;ERROR: Failed to setup a new schema for the OBIA4RTM database! &#39;</span>\
+              <span class="s1">&#39;See log-file in </span><span class="si">{}</span><span class="s1"> for more details.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                      <span class="n">log_dir</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Success! OBIA4RTM is now ready for use!</span><span class="se">\n</span><span class="s1">Configuration files &#39;</span>\
+              <span class="s1">&#39;can be found and modified in </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">obia4rtm_dir</span><span class="p">))</span>
+    <span class="c1"># in case 6S should be installed, too:</span>
+    <span class="k">if</span> <span class="n">install_addons</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;** Installing 6S addon for atmospheric correction!&#39;</span><span class="p">)</span>
+        <span class="n">install_6S</span><span class="p">()</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

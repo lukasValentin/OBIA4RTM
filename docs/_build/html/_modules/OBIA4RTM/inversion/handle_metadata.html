@@ -1,0 +1,164 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>OBIA4RTM.inversion.handle_metadata &#8212; OBIA4RTM 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for OBIA4RTM.inversion.handle_metadata</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Sat Mar  9 10:58:16 2019</span>
+
+<span class="sd">This module is part of OBIA4RTM.</span>
+
+<span class="sd">Copyright (c) 2019 Lukas Graf</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">spectral</span> <span class="kn">import</span> <span class="n">BandResampler</span>
+<span class="kn">from</span> <span class="nn">OBIA4RTM.configurations.logger</span> <span class="kn">import</span> <span class="n">close_logger</span>
+
+
+<div class="viewcode-block" id="get_bands"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.handle_metadata.get_bands">[docs]</a><span class="k">def</span> <span class="nf">get_bands</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">cursor</span><span class="p">,</span> <span class="n">sensor</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    reads in sensor band centers and FWHM stored in database</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2 Database connection</span>
+<span class="sd">        connection to OBIA4RTM PostgreSQL database</span>
+<span class="sd">    cursor : psycopg2 Database cursor</span>
+<span class="sd">        cursor for DB inserts and queries</span>
+<span class="sd">    sensor : String</span>
+<span class="sd">        name of the sensor; currently either &#39;S2A&#39; or &#39;S2B&#39;</span>
+<span class="sd">    logger : logging Logger</span>
+<span class="sd">        for recording errors to the log file</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    centers : List</span>
+<span class="sd">        list of central wavelengths of the spectral bands of the sensor (nm)</span>
+<span class="sd">    fwhm : List</span>
+<span class="sd">        list of the full width half maximum of the spectral bands (nm)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;SELECT central_wvl, band_width FROM public.s2_bands WHERE &quot;</span> \
+            <span class="s2">&quot;sensor = &#39;</span><span class="si">{0}</span><span class="s2">&#39; ORDER by central_wvl;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sensor</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+        <span class="n">centers</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span>
+        <span class="n">fwhm</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not retrieve sensor metatdata!&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">close_logger</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># endif</span>
+    <span class="k">return</span> <span class="n">centers</span><span class="p">,</span> <span class="n">fwhm</span></div>
+<span class="c1"># end get_s2band</span>
+
+
+<div class="viewcode-block" id="get_resampler"><a class="viewcode-back" href="../../../index.html#OBIA4RTM.inversion.handle_metadata.get_resampler">[docs]</a><span class="k">def</span> <span class="nf">get_resampler</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">cursor</span><span class="p">,</span> <span class="n">sensor</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    get the spectral properties of a sensor and generate a resampler object.</span>
+<span class="sd">    Currently, Sentinel-2A and Sentinel-2B are supported</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2 Database connection</span>
+<span class="sd">        connection to OBIA4RTM PostgreSQL database</span>
+<span class="sd">    cursor : psycopg2 Database cursor</span>
+<span class="sd">        cursor for DB inserts and queries</span>
+<span class="sd">    sensor : String</span>
+<span class="sd">        name of the sensor; currently either &#39;S2A&#39; or &#39;S2B&#39;</span>
+<span class="sd">    logger : logging Logger</span>
+<span class="sd">        for recording errors to the log file</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    resampler : spectral BandResampler</span>
+<span class="sd">        Resampler Object for resampling the ProSAIL output to the spectral</span>
+<span class="sd">        resolution of Sentinel-2</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># get S2 sensor-response function</span>
+    <span class="n">centers</span><span class="p">,</span> <span class="n">fwhm</span> <span class="o">=</span> <span class="n">get_bands</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">cursor</span><span class="p">,</span> <span class="n">sensor</span><span class="p">,</span> <span class="n">logger</span><span class="p">)</span>
+    <span class="c1"># define centers and bandwith of prosail output</span>
+    <span class="n">centers_prosail</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">400</span><span class="p">,</span><span class="mi">2501</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">fwhm_prosail</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">centers_prosail</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="c1"># crate a new resampler object to convert the 1nm spectra to the spectral</span>
+    <span class="c1"># resolution of Sentinel-2</span>
+    <span class="n">resampler</span> <span class="o">=</span> <span class="n">BandResampler</span><span class="p">(</span><span class="n">centers_prosail</span><span class="p">,</span> <span class="n">centers</span><span class="p">,</span> <span class="n">fwhm1</span><span class="o">=</span><span class="n">fwhm_prosail</span><span class="p">,</span> <span class="n">fwhm2</span><span class="o">=</span><span class="n">fwhm</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">resampler</span></div>
+<span class="c1"># end get_resampler</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Lukas Graf.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
