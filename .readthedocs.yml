@@ -15,7 +15,6 @@ python:
         path: .
         extra_requirements:
             - docs
-            - libgdal=2.3.1
       - method: setuptools
         path: .
    system_packages: true
