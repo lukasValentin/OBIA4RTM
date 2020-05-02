@@ -8,14 +8,8 @@ addons:
       - sourceline: 'ppa:ubuntugis/ubuntugis-unstable'
     packages:
       - devscripts
-      - libgdal-dev
-      - libproj-dev
-      - libgeos-dev
-      - libudunits2-dev
-      - libnetcdf-dev
-      - netcdf-bin
 before_install:
-  - sudo apt-get install python3-gdal
+  - sudo apt-get install gdal python3-gdal
 install: 
   - pip install .
   - pip install -r requirements.txt
