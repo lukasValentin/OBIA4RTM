@@ -15,7 +15,7 @@ addons:
       - libnetcdf-dev
       - netcdf-bin
 before_install:
-  - pip install GDAL
+  - sudo apt-get install python-gdal
 install: 
   - pip install .
   - pip install -r requirements.txt
