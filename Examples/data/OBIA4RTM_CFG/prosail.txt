@@ -1,12 +1,12 @@
 # Parameters for first land cover class (bare soil)
 #   min     max     num     dist    mean    std     comment
 1.8	1.8	1	0	1.5	0	N
-20	60	40	1	40	15	cab
+20	60	10	1	40	15	cab
  0	0	1	0	0	0	car
- 0.001	0.1	20	2	0	0	cbrown
+ 0.001	0.1	10	2	0	0	cbrown
  0.001	0.001	1	0	0	0	 cw
  0.005	0.005	1	0	0	0	cm
- 0.2	2	30	1	1	0.5	lai
+ 0.2	2	5	1	1	0.5	lai
 0.0	0.0	1	2	0	0	lidfa
 0.0	0.0	1	0	0	0	lidfb
  0.5	0.5	1	0	0	0	rsoil
@@ -16,13 +16,13 @@
 # Parameters for second land cover class (maize silage)
 #   min     max     num     dist    mean    std     comment
 1.8	1.8	1	0	0	0	N
-35.0	60.0	40	1	50.0	6.0	cab
+35.0	60.0	10	1	50.0	6.0	cab
  0	0	1	0	0	0	car
  0.01	0.01	1	0	0	0	cbrown
- 0.012	0.021	10	1	0.016	0.003	cw
+ 0.012	0.021	5	1	0.016	0.003	cw
  0.004	0.004	1	0	0	0	cm
- 0.2	4.0	30	1	2.3	1.3	lai
-45.0	75.0	20	1	63.0	8.0	lidfa
+ 0.2	4.0	10	1	2.3	1.3	lai
+45.0	75.0	10	1	63.0	8.0	lidfa
 -0.15	-0.15	1	0	0	0	lidfb
  0.2	0.2	1	0	0	0	rsoil
  0.5	0.5	1	0	0	0	psoil
@@ -31,13 +31,13 @@
 # Parameters for second land cover class (winter wheat)
 #   min     max     num     dist    mean    std     comment
 1.8	1.8	1	0	0	0	N
-20	60	25	1	50	10	cab
+20	60	10	1	50	10	cab
  0	0	1	0	0	0	car
- 0	0.8	10	1	0.09	0.22	cbrown
+ 0	0.8	5	1	0.09	0.22	cbrown
  0.003	0.020	5	1	0.015	0.004	cw
  0.0047	0.0047	1	0	0	0	cm
- 0.5	6.5	30	1	4.3	1.8	lai
-45.0	80.0	15	1	68.0	9.0	 lidfa
+ 0.5	6.5	10	1	4.3	1.8	lai
+45.0	80.0	5	1	68.0	9.0	 lidfa
 0.0	0.0	1	0	0	0	lidfb
  0.2	0.2	1	0	0	0	rsoil
  0.5	0.5	1	0	0	0	psoil

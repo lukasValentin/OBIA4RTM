@@ -2,12 +2,21 @@ dist: xenial
 language: python
 python:
   - "3.7"
+before_install:
+  - sudo apt install postgresql postgresql-contrib
+  - sudo add-apt-repository ppa:ubuntugis/ppa && sudo apt-get update
+  - sudo apt-get update
+  - sudo apt-get install gdal-bin
+  - sudo apt-get install libgdal-dev
+  - export CPLUS_INCLUDE_PATH=/usr/include/gdal
+  - export C_INCLUDE_PATH=/usr/include/gdal
+  - pip install GDAL
 install: 
   - pip install .
   - pip install -r requirements.txt
   - pip install pytest-cov
   - pip install coveralls
 script:
-  - pytest --cov=obia4rtm/
+  - pytest --cov=obia4rtm/tests.py
 after_success:
   - coveralls

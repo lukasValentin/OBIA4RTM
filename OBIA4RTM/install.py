@@ -85,3 +85,4 @@ def install(install_addons=False):
     if install_addons:
         print('** Installing 6S addon for atmospheric correction!')
         install_6S()
+    return res
