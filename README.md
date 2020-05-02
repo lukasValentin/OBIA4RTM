@@ -1,7 +1,7 @@
 [logo]: https://github.com/lukasValentin/OBIA4RTM/blob/master/obia4rtm_logo.JPG "OBIA4RTM logo"
 **OBIA4RTM**
 ------------
-[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375) [![Python 3.6](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/) [![Coverage Status](https://coveralls.io/repos/github/lukasValentin/OBIA4RTM/badge.svg?branch=master)](https://coveralls.io/github/lukasValentin/OBIA4RTM?branch=master)[![Documentation Status](https://readthedocs.org/projects/obia4rtm/badge/?version=latest)](https://obia4rtm.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/184379375.svg)](https://zenodo.org/badge/latestdoi/184379375) [![Python 3.6](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/) [![Coverage Status](https://coveralls.io/repos/github/lukasValentin/OBIA4RTM/badge.svg?branch=master)](https://coveralls.io/github/lukasValentin/OBIA4RTM?branch=master)[![Documentation Status](https://readthedocs.org/projects/obia4rtm/badge/?version=latest)](https://obia4rtm.readthedocs.io/en/latest/genindex.html)
 
 An open-source tool for object-based image analysis for radiative transfer modeling
 using ProSAIL (Prospect5 + 4SAIL) free for non-commercial applications (research and education) under **Creative Commons Attribution-NonCommercial 4.0 International Public License**.
