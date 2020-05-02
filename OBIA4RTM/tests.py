@@ -13,6 +13,8 @@ from zipfile import ZipFile
 
 from OBIA4RTM.processing_api import API
 from OBIA4RTM.install import install
+from OBIA4RTM.mdata_proc.parse_s2xml import parse_s2xml
+from OBIA4RTM.mdata_proc.insert_scene_metadata import insert_scene_metadata
 
 
 class tests:
@@ -23,7 +25,7 @@ class tests:
     @staticmethod
     def _checkIfInstalls():
         """check if OBIA4RTM backend installs correctly"""
-        res = install.install()
+        res = install()
         assert(res == 0)
 
     def _checkHomeDir(self):
@@ -67,34 +69,30 @@ class tests:
         luc_classes = [0, 1, 2]
 
         # get scene metadata and store it in database
-
-        URL = "http://insert.your/feed/here.xml"
-        response = requests.get(URL)
-        with open('feed.xml', 'wb') as xml_file:
+        xmlURL = 'https://github.com/lukasValentin/OBIA4RTM/raw/master/Examples/data/MTD_TL.xml'
+        response = requests.get(xmlURL)
+        with open('metadata.xml', 'wb') as xml_file:
             xml_file.write(response.content)
+        # parse xml into dict and write to database
+        metadata = parse_s2xml('metadata.xml')
+        insert_scene_metadata(metadata, use_gee=False, raster=imageFile)
 
         # perform the actual inversion
         status = self.api.do_inversion(scene_id,
                                        num_best_solutions,
                                        luc_classes,
                                        return_specs=True)
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+        assert(status == 0)
+
+    def run(self):
+        """calls tests one by one"""
+        self._checkIfInstalls()
+        self._checkHomeDir()
+        self._checkConfigFile()
+        self._checkTables()
+        self._checkInvsersion()
+
+
+if __name__ == '__main__':
+    tester = tests()
+    tester.run()

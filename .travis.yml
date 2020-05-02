@@ -2,12 +2,19 @@ dist: xenial
 language: python
 python:
   - "3.7"
+addons:
+  apt:
+    sources:
+      - sourceline: 'ppa:ubuntugis/ubuntugis-unstable'
+    packages:
+      - devscripts
+      - libgdal-dev
+      - libproj-dev
+      - libgeos-dev
+      - libudunits2-dev
+      - libnetcdf-dev
+      - netcdf-bin
 before_install:
-  - sudo apt install postgresql postgresql-contrib
-  - sudo apt-get install gdal-bin
-  - sudo apt-get install libgdal-dev
-  - export CPLUS_INCLUDE_PATH=/usr/include/gdal
-  - export C_INCLUDE_PATH=/usr/include/gdal
   - pip install GDAL
 install: 
   - pip install .
