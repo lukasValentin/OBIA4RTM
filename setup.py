@@ -21,7 +21,6 @@ setuptools.setup(name='OBIA4RTM',
       packages=setuptools.find_packages(),
       classifiers = [
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Non-commercial usage for education and research",
         "Operating System :: OS Independent",
     ],
      )
