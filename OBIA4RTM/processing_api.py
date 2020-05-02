@@ -17,13 +17,10 @@ import os
 import sys
 from configparser import ConfigParser, MissingSectionHeaderError
 import OBIA4RTM
-from OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor import s2_Py6S_atcorr
 from OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor import do_sen2core_preprocessing
 from OBIA4RTM.S2_PreProcessor.s2_sen2core_attcor import call_gdal_merge
 from OBIA4RTM.mdata_proc.parse_s2xml import parse_s2xml
-from OBIA4RTM.mdata_proc.handle_gee_metadata import parse_gee_metadata
 from OBIA4RTM.mdata_proc.insert_scene_metadata import insert_scene_metadata
-from OBIA4RTM.zonal_stats.get_mean_refl_ee import get_mean_refl_ee
 from OBIA4RTM.zonal_stats.get_mean_refl import get_mean_refl
 from OBIA4RTM.inversion.inversion import inversion
 
@@ -63,6 +60,14 @@ class API:
             sys.exit(-1)
         # set to class attribute
         self.__use_gee = use_gee
+
+        # to avoid build errors in case GEE should not be used import the
+        # modules only, if use_gee is set to true
+        if self.__use_gee:
+            from OBIA4RTM.S2_PreProcessor.s2_Py6S_attcor import s2_Py6S_atcorr
+            from OBIA4RTM.mdata_proc.handle_gee_metadata import parse_gee_metadata
+            from OBIA4RTM.mdata_proc.insert_scene_metadata import insert_scene_metadata
+        
         # determine the OBIA4RTM user directroy where all the config files
         # are stored
         if obia4rtm_home is None:
