@@ -22,6 +22,6 @@ install:
   - pip install pytest-cov
   - pip install coveralls
 script:
-  - python3 obia4rtm/tests.py
+  - python3 tests.py
 after_success:
   - coveralls
