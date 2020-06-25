@@ -11,11 +11,12 @@ env:
     - PROJINST=$HOME/gdalinstall
     - PROJBUILD=$HOME/projbuild
 
-python:
-  - "3.7"
-  env:
-        GDALVERSION="3.0.4"
-        PROJVERSION="6.2.1"
+jobs:
+  include:
+    - python: "3.7"
+      env:
+        GDALVERSION="2.4.4"
+        PROJVERSION="4.9.3"
 
 addons:
   apt:
