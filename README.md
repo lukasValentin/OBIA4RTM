@@ -197,7 +197,7 @@ Sample data can be found here: http://dx.doi.org/10.17632/vs55cwssyh.1 showing s
 
 Publications
 ------------
-coming soon
+Lukas Graf, Levente Papp & Stefan Lang (2020) OBIA4RTM – towards an operational open-source solution for coupling object-based image analysis with radiative transfer modelling, European Journal of Remote Sensing, DOI: 10.1080/22797254.2020.1810132
 
 OBIA4RTM
 --------
