@@ -4,3 +4,4 @@ include /OBIA4RTM/prosail.txt
 include /OBIA4RTM/soil_reflectance.txt
 include /OBIA4RTM/SQL/Tables/*.sql
 include /OBIA4RTM/SQL/Queries_Functions/*.sql
+include scripts/*.sh

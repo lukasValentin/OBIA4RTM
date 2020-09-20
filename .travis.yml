@@ -1,21 +1,56 @@
 dist: xenial
+
 language: python
-python:
-  - "3.7"
+
+env:
+  global:
+    - PIP_WHEEL_DIR=$HOME/.cache/pip/wheels
+    - PIP_FIND_LINKS=file://$HOME/.cache/pip/wheels
+    - GDALINST=$HOME/gdalinstall
+    - GDALBUILD=$HOME/gdalbuild
+    - PROJINST=$HOME/gdalinstall
+    - PROJBUILD=$HOME/projbuild
+
+jobs:
+  include:
+    - python: "3.7"
+      env:
+        GDALVERSION="2.4.4"
+        PROJVERSION="4.9.3"
+
 addons:
   apt:
-    sources:
-      - sourceline: 'ppa:ubuntugis/ubuntugis-unstable'
     packages:
       - devscripts
+      - libhdf5-serial-dev
+      - libgdal-dev
+      - libatlas-dev
+      - libatlas-base-dev
+      - gfortran
+ 
 before_install:
-  - sudo apt-get install python3-gdal
-install: 
+  - export PATH=$GDALINST/gdal-$GDALVERSION/bin:$PATH
+  - export LD_LIBRARY_PATH=$GDALINST/gdal-$GDALVERSION/lib:$LD_LIBRARY_PATH
+  - . ./scripts/travis_proj_install.sh
+  - travis_wait 20 . ./scripts/travis_gdal_install.sh
+  - export GDAL_DATA=$GDALINST/gdal-$GDALVERSION/share/gdal
+  - export PROJ_LIB=$GDALINST/gdal-$GDALVERSION/share/proj
+ 
+install:
   - pip install .
+  - "if [ \"$GDALVERSION\" == \"master\" -o $(gdal-config --version) == \"$GDALVERSION\" ]; then echo \"Using gdal $GDALVERSION\"; else echo \"NOT using gdal $GDALVERSION as expected; aborting\"; exit 1; fi"
+  - "GDAL_CONFIG=$GDALINST/gdal-$GDALVERSION/bin/gdal-config python -m pip install --no-deps --force-reinstall --no-use-pep517 -e ."
   - pip install -r requirements.txt
   - pip install pytest-cov
   - pip install coveralls
+
 script:
   - python3 tests.py
+
 after_success:
   - coveralls
+
+cache:
+  directories:
+    - $GDALINST
+    - ~/.cache/pip
