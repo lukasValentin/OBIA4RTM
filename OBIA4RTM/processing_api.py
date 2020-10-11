@@ -77,13 +77,12 @@ class API:
             with open(fname, 'r') as data:
                 obia4rtm_home = data.readline()
         # in any case, check if the directory is existing and can be accessed
-        if not os.path.isdir(obia4rtm_home):
-            alternative_home = expanduser("~")
-            print('travis home: ' + alternative_home)
+        if not os.path.isdir(obia4rtm_home) and not os.path.islink(obia4rtm_home):
+
             raise FileNotFoundError("Your OBIA4RTM user directory seems to "\
                   "be invalid!\nPlease check your OBIA4RTM installation or the "\
-                  "path you specified! (Assumed location: {0} - Travis location"\
-                  "{1})".format(obia4rtm_home, alternative_home))
+                  "path you specified! (Assumed location: {0}".format(
+                          obia4rtm_home))
             sys.exit(-1)
         # set the class attribute
         self.obia4rtm_home = obia4rtm_home
