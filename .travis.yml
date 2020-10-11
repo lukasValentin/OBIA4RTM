@@ -39,6 +39,7 @@ before_install:
  
 install:
   - pip install .
+  - pip install gdal==`gdal-config --version`
   - pip install -r requirements.txt
   - pip install pytest-cov
   - pip install coveralls
