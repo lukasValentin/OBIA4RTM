@@ -82,7 +82,8 @@ class API:
             print('travis home: ' + alternative_home)
             raise FileNotFoundError("Your OBIA4RTM user directory seems to "\
                   "be invalid!\nPlease check your OBIA4RTM installation or the "\
-                  "path you specified! (Assumed location: {})".format(obia4rtm_home))
+                  "path you specified! (Assumed location: {0} - Travis location"\
+                  "{1})".format(obia4rtm_home, alternative_home))
             sys.exit(-1)
         # set the class attribute
         self.obia4rtm_home = obia4rtm_home
