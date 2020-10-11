@@ -30,6 +30,10 @@ addons:
       - libatlas-dev
       - libatlas-base-dev
       - gfortran
+  postgresql: 9.6
+  apt:
+    packages:
+    - postgresql-9.6-postgis-2.3
  
 before_install:
   - sudo apt-add-repository ppa:ubuntugis/ubuntugis-unstable -y
