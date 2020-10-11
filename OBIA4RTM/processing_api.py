@@ -79,7 +79,7 @@ class API:
         if not os.path.isdir(obia4rtm_home):
             raise FileNotFoundError("Your OBIA4RTM user directory seems to "\
                   "be invalid!\nPlease check your OBIA4RTM installation or the "\
-                  "path you specified!")
+                  "path you specified! (Assumed location: {})".format(obia4rtm_home))
             sys.exit(-1)
         # set the class attribute
         self.obia4rtm_home = obia4rtm_home
