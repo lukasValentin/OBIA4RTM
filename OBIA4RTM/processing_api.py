@@ -14,6 +14,7 @@ Copyright (c) 2019 Lukas Graf
 @author: Lukas Graf, graflukas@web.de
 """
 import os
+from os.path import expanduser
 import sys
 from configparser import ConfigParser, MissingSectionHeaderError
 import OBIA4RTM
@@ -77,6 +78,8 @@ class API:
                 obia4rtm_home = data.readline()
         # in any case, check if the directory is existing and can be accessed
         if not os.path.isdir(obia4rtm_home):
+            alternative_home = expanduser("~")
+            print('travis home: ' + alternative_home)
             raise FileNotFoundError("Your OBIA4RTM user directory seems to "\
                   "be invalid!\nPlease check your OBIA4RTM installation or the "\
                   "path you specified! (Assumed location: {})".format(obia4rtm_home))
