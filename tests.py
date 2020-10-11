@@ -28,10 +28,6 @@ class tests:
         res = install()
         assert(res == 0)
 
-    def _checkHomeDir(self):
-        """checks if the OBIA4RTM directory exists"""
-        assert(os.path.isdir(self.api.obia4rtm_home))
-
     def _checkTables(self):
         """checks if the table names are filled"""
         self.api.set_tablenames()
@@ -87,7 +83,6 @@ class tests:
     def run(self):
         """calls tests one by one"""
         self._checkIfInstalls()
-        self._checkHomeDir()
         self._checkConfigFile()
         self._checkTables()
         self._checkInvsersion()

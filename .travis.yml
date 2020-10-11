@@ -18,6 +18,9 @@ jobs:
         GDALVERSION="2.4.4"
         PROJVERSION="4.9.3"
 
+services:
+  - postgresql
+
 addons:
   apt:
     packages:
@@ -36,6 +39,7 @@ before_install:
   - export C_INCLUDE_PATH=/usr/include/gdal
   - gdal-config --version
   - gdalinfo --version
+  - psql -c 'create database postgres;' -U postgres
  
 install:
   - pip install .
