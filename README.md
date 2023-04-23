@@ -1,3 +1,5 @@
+**The development of OBIA4RTM is discontinued in favor of the [Earth Observation Data Analysis Library EOdal](https://github.com/EOA-team/eodal)**.
+
 [logo]: https://github.com/lukasValentin/OBIA4RTM/blob/master/obia4rtm_logo.JPG "OBIA4RTM logo"
 **OBIA4RTM**
 ------------
